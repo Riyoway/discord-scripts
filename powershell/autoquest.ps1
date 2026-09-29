@@ -12,12 +12,15 @@ $expr = "(function(){`n$code`n})()"
 # Ensure the desktop client is running with the debug port open.
 function Test-Port { try { Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec 2 | Out-Null; $true } catch { $false } }
 if (-not (Test-Port)) {
-    $upd = "$env:LOCALAPPDATA\Discord\Update.exe"
-    if (-not (Test-Path $upd)) { throw "Discord desktop app not found. This runner injects into the desktop app, not the browser." }
-    Write-Host "Restarting Discord with remote debugging enabled (any call will drop)..." -ForegroundColor Cyan
-    Get-Process Discord -EA SilentlyContinue | Stop-Process -Force
+    # Works with any flavor: folder name == process name == "<name>.exe".
+    $installed = "Discord", "DiscordPTB", "DiscordCanary", "DiscordDevelopment" | Where-Object { Test-Path "$env:LOCALAPPDATA\$_\Update.exe" }
+    if (-not $installed) { throw "No Discord desktop app found (looked for Discord, PTB, Canary, Development)." }
+    $flavor = ($installed | Where-Object { Get-Process $_ -EA SilentlyContinue } | Select-Object -First 1)
+    if (-not $flavor) { $flavor = $installed | Select-Object -First 1 }
+    Write-Host "Restarting $flavor with remote debugging enabled (any call will drop)..." -ForegroundColor Cyan
+    Get-Process $flavor -EA SilentlyContinue | Stop-Process -Force
     Start-Sleep 2
-    & $upd --processStart Discord.exe --process-start-args "--remote-debugging-port=$port"
+    & "$env:LOCALAPPDATA\$flavor\Update.exe" --processStart "$flavor.exe" --process-start-args "--remote-debugging-port=$port"
     $ok = $false; for ($i = 0; $i -lt 30; $i++) { Start-Sleep 1; if (Test-Port) { $ok = $true; break } }
     if (-not $ok) { throw "Debug port never opened; this Discord build may block --remote-debugging-port." }
 }
