@@ -6,6 +6,7 @@ Scripts for Discord, served from [script.riyo.me](https://script.riyo.me). Each 
 | --- | --- |
 | [`autoquest`](console/autoquest.js) | Enrolls in and completes every active Discord Quest, one at a time |
 | [`token`](console/token.js) | Prints your account token |
+| [`timestamp`](console/timestamp.js) | Overlay that builds Discord `<t:…>` timestamp codes and copies them |
 
 ## Usage
 
