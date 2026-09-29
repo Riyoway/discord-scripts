@@ -7,6 +7,9 @@ Scripts for Discord, served from [script.riyo.me](https://script.riyo.me). Each 
 | [`autoquest`](console/autoquest.js) | Enrolls in and completes every active Discord Quest, one at a time |
 | [`token`](console/token.js) | Prints your account token |
 | [`timestamp`](console/timestamp.js) | Overlay that builds Discord `<t:…>` timestamp codes and copies them |
+| [`media`](console/media.js) | Downloads the images and videos on the open page (all / images / videos) |
+| [`whoami`](console/whoami.js) | Prints your account and a server/DM/friend inventory (read-only) |
+| [`export`](console/export.js) | Saves the open DM/channel as a self-contained, Discord-looking HTML file |
 
 ## Usage
 
