@@ -1,6 +1,6 @@
 # discord-scripts
 
-Scripts for Discord, served from [script.riyo.me](https://script.riyo.me). Each script comes in two forms: a [`console/`](console) script to paste into DevTools, and a [`powershell/`](powershell) runner that injects it into the desktop client for you.
+Scripts for Discord, served from [script.riyo.me](https://script.riyo.me) — browse the full list with copy/run commands there. Each script comes in two forms: a [`console/`](console) script to paste into DevTools, and a [`powershell/`](powershell) runner that injects it into the desktop client for you.
 
 | Script | What it does |
 | --- | --- |
