@@ -4,31 +4,64 @@
 # Self-contained per script; factor the shared CDP block into a helper if these multiply.
 $ErrorActionPreference = "Stop"
 $port = 9222
+Write-Host "Fetching autoquest..." -ForegroundColor Cyan
 $code = Invoke-RestMethod "https://script.riyo.me/d/autoquest"
+# Wrap in an IIFE so the script's top-level `let`s don't collide when injected twice.
+$expr = "(function(){`n$code`n})()"
 
-# Ensure Discord is running with the debug port open.
+# Ensure the desktop client is running with the debug port open.
 function Test-Port { try { Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec 2 | Out-Null; $true } catch { $false } }
 if (-not (Test-Port)) {
-    Get-Process Discord -EA SilentlyContinue | Stop-Process -Force   # full quit; interrupts calls
+    $upd = "$env:LOCALAPPDATA\Discord\Update.exe"
+    if (-not (Test-Path $upd)) { throw "Discord desktop app not found. This runner injects into the desktop app, not the browser." }
+    Write-Host "Restarting Discord with remote debugging enabled (any call will drop)..." -ForegroundColor Cyan
+    Get-Process Discord -EA SilentlyContinue | Stop-Process -Force
     Start-Sleep 2
-    & "$env:LOCALAPPDATA\Discord\Update.exe" --processStart Discord.exe --process-start-args "--remote-debugging-port=$port"
+    & $upd --processStart Discord.exe --process-start-args "--remote-debugging-port=$port"
     $ok = $false; for ($i = 0; $i -lt 30; $i++) { Start-Sleep 1; if (Test-Port) { $ok = $true; break } }
     if (-not $ok) { throw "Debug port never opened; this Discord build may block --remote-debugging-port." }
 }
 
-# Find the discord.com window and inject (runs in the page's main world, same as the console).
+# Find the main Discord window.
+Write-Host "Locating the Discord window..." -ForegroundColor Cyan
 $page = $null
 for ($i = 0; $i -lt 20 -and -not $page; $i++) {
     Start-Sleep 1
-    $page = Invoke-RestMethod "http://127.0.0.1:$port/json" | Where-Object { $_.type -eq 'page' -and $_.url -match 'discord.com' } | Select-Object -First 1
+    $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" | Where-Object { $_.type -eq 'page' -and $_.url -match 'discord.com' }
+    $page = ($pages | Where-Object { $_.url -match '/channels|/app' } | Select-Object -First 1)
+    if (-not $page) { $page = $pages | Select-Object -First 1 }
 }
-if (-not $page) { throw "No Discord window found on the debug port." }
+if (-not $page) { throw "No Discord window found on the debug port. Open the main window and log in first." }
 
 $ws = [Net.WebSockets.ClientWebSocket]::new()
 $ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, [Threading.CancellationToken]::None).Wait()
-$msg = @{ id = 1; method = "Runtime.evaluate"; params = @{ expression = $code; userGesture = $true; awaitPromise = $false } } | ConvertTo-Json -Compress -Depth 5
-$b = [Text.Encoding]::UTF8.GetBytes($msg)
-$ws.SendAsync([ArraySegment[byte]]::new($b), 'Text', $true, [Threading.CancellationToken]::None).Wait()
-$rb = [byte[]]::new(65536)
-$r = $ws.ReceiveAsync([ArraySegment[byte]]::new($rb), [Threading.CancellationToken]::None); $r.Wait(); $ws.Dispose()
-"autoquest injected."
+function Invoke-Cdp($id, $e) {
+    $msg = @{ id = $id; method = "Runtime.evaluate"; params = @{ expression = $e; userGesture = $true; awaitPromise = $false } } | ConvertTo-Json -Compress -Depth 5
+    $b = [Text.Encoding]::UTF8.GetBytes($msg)
+    $ws.SendAsync([ArraySegment[byte]]::new($b), 'Text', $true, [Threading.CancellationToken]::None).Wait()
+    while ($true) {
+        $sb = [Text.StringBuilder]::new()
+        do {
+            $seg = [ArraySegment[byte]]::new([byte[]]::new(16384))
+            $r = $ws.ReceiveAsync($seg, [Threading.CancellationToken]::None); $r.Wait()
+            [void]$sb.Append([Text.Encoding]::UTF8.GetString($seg.Array, 0, $r.Result.Count))
+        } while (-not $r.Result.EndOfMessage)
+        $o = $sb.ToString() | ConvertFrom-Json
+        if ($o.id -eq $id) { return $o }
+    }
+}
+
+# The renderer may still be booting; wait for its webpack registry before injecting.
+for ($i = 0; $i -lt 20; $i++) {
+    if ((Invoke-Cdp $i "typeof webpackChunkdiscord_app").result.result.value -eq 'object') { break }
+    Start-Sleep 1
+}
+
+Write-Host "Injecting..." -ForegroundColor Cyan
+$reply = Invoke-Cdp 100 $expr
+$ws.Dispose()
+if ($reply.result.exceptionDetails) {
+    $ex = $reply.result.exceptionDetails
+    throw "autoquest threw inside Discord: $(if ($ex.exception.description) { $ex.exception.description } else { $ex.text })"
+}
+Write-Host "autoquest injected. Look for the crossed-swords icon in Discord's top-right corner." -ForegroundColor Green
