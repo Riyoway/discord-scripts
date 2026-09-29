@@ -1,5 +1,5 @@
 # Read your Discord token via the desktop client's Chrome DevTools Protocol.
-#   irm https://script.riyo.me/p/token | iex
+#   irm https://script.riyo.me/d/token.ps1 | iex
 # Self-contained per script; factor the shared CDP block into a helper if these multiply.
 $ErrorActionPreference = "Stop"
 $port = 9222
