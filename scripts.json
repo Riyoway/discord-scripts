@@ -1,8 +1,8 @@
 [
-  { "name": "autoquest", "desc": "Complete every active Discord Quest automatically.", "run": true },
-  { "name": "token", "desc": "Copy your account token to the clipboard.", "run": true },
-  { "name": "timestamp", "desc": "Build and copy Discord <t:...> timestamp codes.", "run": false },
-  { "name": "media", "desc": "Download the images and videos on the open page.", "run": false },
-  { "name": "whoami", "desc": "Print your account and a server/DM/friend inventory (read-only).", "run": false },
-  { "name": "export", "desc": "Save the open DM/channel as a Discord-looking HTML file.", "run": false }
+  { "category": "Discord", "name": "autoquest", "desc": "Complete every active Discord Quest automatically.", "run": true },
+  { "category": "Discord", "name": "token", "desc": "Copy your account token to the clipboard.", "run": true },
+  { "category": "Discord", "name": "timestamp", "desc": "Build and copy Discord <t:...> timestamp codes.", "run": false },
+  { "category": "Discord", "name": "media", "desc": "Download the images and videos on the open page.", "run": false },
+  { "category": "Discord", "name": "whoami", "desc": "Print your account and a server/DM/friend inventory (read-only).", "run": false },
+  { "category": "Discord", "name": "export", "desc": "Save the open DM/channel as a Discord-looking HTML file.", "run": false }
 ]
