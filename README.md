@@ -36,6 +36,7 @@ A one-line loader such as `fetch("https://script.riyo.me/d/c/autoquest")` does n
 To skip the console entirely, each script has its own one-line runner. It injects the script into the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so the CSP never applies. The `.js` files are unchanged; CDP runs them in the same place the console would.
 
 ```powershell
+irm https://script.riyo.me/d/p/menu | iex          # interactive picker (browse / copy / run)
 irm https://script.riyo.me/d/p/autoquest | iex     # run autoquest
 irm https://script.riyo.me/d/p/token | iex         # copy your token to the clipboard
 ```
