@@ -14,10 +14,10 @@ Every script runs in Discord's DevTools console, in the desktop app or on discor
 1. Copy the script. Open `https://script.riyo.me/d/autoquest` in any browser, press `Ctrl+A`, then `Ctrl+C`. Or copy it from a terminal:
 
    ```powershell
-   irm script.riyo.me/d/autoquest | scb             # Windows (PowerShell)
+   irm https://script.riyo.me/d/autoquest | scb             # Windows (PowerShell)
    ```
    ```sh
-   curl -sL script.riyo.me/d/autoquest | pbcopy     # macOS
+   curl -sL https://script.riyo.me/d/autoquest | pbcopy     # macOS
    ```
 
 2. In Discord, press `Ctrl+Shift+I` (`Cmd+Opt+I` on macOS) and open the **Console** tab.
@@ -30,11 +30,11 @@ A one-line loader such as `fetch("https://script.riyo.me/d/autoquest")` does not
 To skip the console entirely, each script has its own one-line runner. It injects the script into the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so the CSP never applies. The `.js` files are unchanged; CDP runs them in the same place the console would.
 
 ```powershell
-irm script.riyo.me/p/autoquest | iex     # run autoquest
-irm script.riyo.me/p/token | iex         # print your token
+irm https://script.riyo.me/p/autoquest | iex     # run autoquest
+irm https://script.riyo.me/p/token | iex         # copy your token to the clipboard
 ```
 
-From Command Prompt, wrap it: `powershell -c "irm script.riyo.me/p/autoquest | iex"`.
+Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/p/autoquest | iex"`.
 
 The runner quits Discord (interrupting any call), relaunches it with `--remote-debugging-port=9222`, and runs the script in the main window. The debug port stays open until Discord is restarted normally; while it is open, any local program can run code in your Discord, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`; verify with `irm http://127.0.0.1:9222/json/version` after launch.
 
