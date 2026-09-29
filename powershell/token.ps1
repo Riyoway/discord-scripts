@@ -65,4 +65,6 @@ if ($reply.result.exceptionDetails) {
 }
 $token = $reply.result.result.value
 if (-not $token) { throw "No token returned. Are you logged in to the desktop app?" }
-$token
+Set-Clipboard -Value $token   # kept off the terminal so it isn't left in scrollback/history
+$mask = if ($token.Length -gt 12) { $token.Substring(0, 6) + "..." + $token.Substring($token.Length - 4) } else { "****" }
+Write-Host "Token copied to clipboard ($mask)." -ForegroundColor Green
