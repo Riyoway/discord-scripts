@@ -1,6 +1,6 @@
 # Inject autoquest into the Discord desktop client over the Chrome DevTools Protocol.
 # PowerShell does the fetching, so Discord's CSP never applies.
-#   irm script.riyo.me/p/autoquest | iex
+#   irm https://script.riyo.me/p/autoquest | iex
 # Self-contained per script; factor the shared CDP block into a helper if these multiply.
 $ErrorActionPreference = "Stop"
 $port = 9222
@@ -25,44 +25,48 @@ if (-not (Test-Port)) {
     if (-not $ok) { throw "Debug port never opened; this Discord build may block --remote-debugging-port." }
 }
 
-# Find the main Discord window.
+# Find the main Discord window (each /json call is capped so a stuck port can't hang us).
 Write-Host "Locating the Discord window..." -ForegroundColor Cyan
 $page = $null
 for ($i = 0; $i -lt 20 -and -not $page; $i++) {
     Start-Sleep 1
-    $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" | Where-Object { $_.type -eq 'page' -and $_.url -match 'discord.com' }
+    try { $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 3 | Where-Object { $_.type -eq 'page' -and $_.url -match 'discord.com' } } catch { continue }
     $page = ($pages | Where-Object { $_.url -match '/channels|/app' } | Select-Object -First 1)
     if (-not $page) { $page = $pages | Select-Object -First 1 }
 }
 if (-not $page) { throw "No Discord window found on the debug port. Open the main window and log in first." }
 
 $ws = [Net.WebSockets.ClientWebSocket]::new()
-$ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, [Threading.CancellationToken]::None).Wait()
-function Invoke-Cdp($id, $e) {
-    $msg = @{ id = $id; method = "Runtime.evaluate"; params = @{ expression = $e; userGesture = $true; awaitPromise = $false } } | ConvertTo-Json -Compress -Depth 5
-    $b = [Text.Encoding]::UTF8.GetBytes($msg)
-    $ws.SendAsync([ArraySegment[byte]]::new($b), 'Text', $true, [Threading.CancellationToken]::None).Wait()
-    while ($true) {
-        $sb = [Text.StringBuilder]::new()
-        do {
-            $seg = [ArraySegment[byte]]::new([byte[]]::new(16384))
-            $r = $ws.ReceiveAsync($seg, [Threading.CancellationToken]::None); $r.Wait()
-            [void]$sb.Append([Text.Encoding]::UTF8.GetString($seg.Array, 0, $r.Result.Count))
-        } while (-not $r.Result.EndOfMessage)
-        $o = $sb.ToString() | ConvertFrom-Json
-        if ($o.id -eq $id) { return $o }
-    }
+if (-not $ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, [Threading.CancellationToken]::None).Wait(5000)) { throw "Timed out connecting to the Discord debug socket." }
+function Invoke-Cdp($id, $e, $timeoutMs = 8000) {
+    $cts = [Threading.CancellationTokenSource]::new($timeoutMs)
+    try {
+        $msg = @{ id = $id; method = "Runtime.evaluate"; params = @{ expression = $e; userGesture = $true; awaitPromise = $false } } | ConvertTo-Json -Compress -Depth 5
+        $b = [Text.Encoding]::UTF8.GetBytes($msg)
+        $ws.SendAsync([ArraySegment[byte]]::new($b), 'Text', $true, $cts.Token).Wait()
+        while ($true) {
+            $sb = [Text.StringBuilder]::new()
+            do {
+                $seg = [ArraySegment[byte]]::new([byte[]]::new(16384))
+                $r = $ws.ReceiveAsync($seg, $cts.Token); $r.Wait()
+                [void]$sb.Append([Text.Encoding]::UTF8.GetString($seg.Array, 0, $r.Result.Count))
+            } while (-not $r.Result.EndOfMessage)
+            $o = $sb.ToString() | ConvertFrom-Json
+            if ($o.id -eq $id) { return $o }
+        }
+    } catch { return $null } finally { $cts.Dispose() }
 }
 
 # The renderer may still be booting; wait for its webpack registry before injecting.
 for ($i = 0; $i -lt 20; $i++) {
-    if ((Invoke-Cdp $i "typeof webpackChunkdiscord_app").result.result.value -eq 'object') { break }
+    if ((Invoke-Cdp $i "typeof webpackChunkdiscord_app" 3000).result.result.value -eq 'object') { break }
     Start-Sleep 1
 }
 
 Write-Host "Injecting..." -ForegroundColor Cyan
 $reply = Invoke-Cdp 100 $expr
 $ws.Dispose()
+if (-not $reply) { throw "Timed out waiting for Discord to run the script." }
 if ($reply.result.exceptionDetails) {
     $ex = $reply.result.exceptionDetails
     throw "autoquest threw inside Discord: $(if ($ex.exception.description) { $ex.exception.description } else { $ex.text })"
