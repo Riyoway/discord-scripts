@@ -1,6 +1,6 @@
 # discord-scripts
 
-Scripts for Discord, served from [script.riyo.me](https://script.riyo.me) — browse the full list with copy/run commands there. Each script comes in two forms: a [`console/`](console) script to paste into DevTools, and a [`powershell/`](powershell) runner that injects it into the desktop client for you.
+Scripts for Discord, served from the [script library](https://script.riyo.me/library?=discord). Browse, read, and copy the source there. All scripts have a [`console/`](console) version to paste into DevTools; some have a [`powershell/`](powershell) runner that injects the script into the desktop client.
 
 | Script | What it does |
 | --- | --- |
@@ -10,6 +10,9 @@ Scripts for Discord, served from [script.riyo.me](https://script.riyo.me) — br
 | [`media`](console/media.js) | Downloads the images and videos on the open page (all / images / videos) |
 | [`whoami`](console/whoami.js) | Prints your account and a server/DM/friend inventory (read-only) |
 | [`export`](console/export.js) | Saves the open DM/channel as a self-contained, Discord-looking HTML file |
+| [`snowflake`](console/snowflake.js) | Decodes an ID or message link into its creation time and a Discord timestamp |
+
+`snowflake` uses the timestamp bits and epoch documented in [Discord's Snowflake reference](https://docs.discord.com/developers/reference#snowflakes).
 
 For drafting and formatting messages without running code inside Discord, use the standalone [message helper](https://script.riyo.me/message-helper.html).
 
@@ -82,4 +85,4 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 
 ## Adding a script
 
-Vercel rewrites proxy this repo's `main` branch: `script.riyo.me/d/c/<name>` serves `console/<name>.js` (copy-paste) and `script.riyo.me/p/<name>` serves `powershell/<name>.ps1` (run with `| iex`). The old `/d/p/<name>` route remains as an alias. To publish a script, push `console/<name>.js`; add `powershell/<name>.ps1` for a runner and list it in `scripts.json`. GitHub's cache can take up to 5 minutes to update.
+Vercel rewrites proxy this repo's `main` branch: `script.riyo.me/d/c/<name>` serves `console/<name>.js` (copy-paste) and `script.riyo.me/p/<name>` serves `powershell/<name>.ps1` (run with `| iex`). The old `/d/p/<name>` route remains as an alias. To publish a script, push its source file, then add an entry to `scripts.json` with `category`, `name`, `desc`, `source`, and `github`; add `runner` when a PowerShell runner exists. The library page and menu read that manifest. GitHub's cache can take up to 5 minutes to update.

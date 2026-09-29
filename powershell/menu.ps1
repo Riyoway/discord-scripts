@@ -9,7 +9,8 @@ $scripts = @($raw | ConvertFrom-Json)
 if (-not $scripts.Count) { Write-Host "Could not load the script list."; return }
 $categories = @($scripts | Group-Object { if ($_.category) { $_.category } else { "Discord" } })
 
-function Copy-Console($name) { Set-Clipboard -Value (Invoke-RestMethod "$BASE/d/c/$name") }
+function Resolve-ScriptUrl($path) { if ($path -match '^https?://') { $path } else { "$BASE$path" } }
+function Copy-Source($script) { Set-Clipboard -Value (Invoke-RestMethod (Resolve-ScriptUrl $script.source)) }
 
 function Select-Item($items, $title, $category = $false) {
     if ([Console]::IsInputRedirected) {
@@ -23,7 +24,7 @@ function Select-Item($items, $title, $category = $false) {
     }
 
     $sel = 0
-    $status = if ($category) { "Up/Down move   Enter open   Q quit" } else { "Up/Down move   Enter run-or-copy   C copy console   P copy command   Q quit" }
+    $status = if ($category) { "Up/Down move   Enter open   Q quit" } else { "Up/Down move   Enter run-or-copy   C copy source   P copy command   Q quit" }
     [Console]::CursorVisible = $false
     try {
     while ($true) {
@@ -34,7 +35,7 @@ function Select-Item($items, $title, $category = $false) {
             if ($category) { $line = "  {0,-14} {1} scripts" -f $items[$i].Name, $items[$i].Count }
             else {
                 $s = $items[$i]
-                $tag = if ($s.run) { "run" } else { "   " }
+                $tag = if ($s.runner) { "run" } else { "   " }
                 $line = "  {0,-11} {1}  {2}" -f $s.name, $tag, $s.desc
             }
             if ($i -eq $sel) { Write-Host $line -ForegroundColor Black -BackgroundColor Cyan }
@@ -58,10 +59,10 @@ function Select-Item($items, $title, $category = $false) {
             "K"         { $sel = ($sel - 1 + $items.Count) % $items.Count }
             "DownArrow" { $sel = ($sel + 1) % $items.Count }
             "J"         { $sel = ($sel + 1) % $items.Count }
-            "C"         { Copy-Console $items[$sel].name; $status = "Copied '$($items[$sel].name)' console script - paste into DevTools" }
+            "C"         { Copy-Source $items[$sel]; $status = "Copied source for '$($items[$sel].name)'" }
             "P" {
                 $s = $items[$sel]
-                $cmd = if ($s.run) { "irm $BASE/p/$($s.name) | iex" } else { "irm $BASE/d/c/$($s.name) | scb" }
+                $cmd = if ($s.runner) { "irm $(Resolve-ScriptUrl $s.runner) | iex" } else { "irm $(Resolve-ScriptUrl $s.source) | scb" }
                 Set-Clipboard -Value $cmd; $status = "Copied command: $cmd"
             }
             "Enter" {
@@ -80,12 +81,12 @@ $categoryScripts = @($category.Group)
 $selected = Select-Item $categoryScripts "$($category.Name) scripts"
 if (-not $selected) { Write-Host "Cancelled."; return }
 if ([Console]::IsInputRedirected) {
-    if (-not $selected.run -or (Read-Host "[r]un or [c]opy console? (r/c)") -ne "r") {
-        Copy-Console $selected.name
-        Write-Host "Copied '$($selected.name)' console script to the clipboard." -ForegroundColor Green
+    if (-not $selected.runner -or (Read-Host "[r]un or [c]opy source? (r/c)") -ne "r") {
+        Copy-Source $selected
+        Write-Host "Copied source for '$($selected.name)' to the clipboard." -ForegroundColor Green
         return
     }
 }
 else { Clear-Host }
-if ($selected.run) { iex (Invoke-RestMethod "$BASE/p/$($selected.name)") }
-else { Copy-Console $selected.name; Write-Host "Copied '$($selected.name)' console script. Paste it into Discord's DevTools console." -ForegroundColor Green }
+if ($selected.runner) { iex (Invoke-RestMethod (Resolve-ScriptUrl $selected.runner)) }
+else { Copy-Source $selected; Write-Host "Copied source for '$($selected.name)' to the clipboard." -ForegroundColor Green }
