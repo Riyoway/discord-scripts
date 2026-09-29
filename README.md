@@ -17,30 +17,30 @@ For drafting and formatting messages without running code inside Discord, use th
 
 Every script runs in Discord's DevTools console, in the desktop app or on discord.com.
 
-1. Copy the script. The console source is always at `/d/<name>.js`. Open `https://script.riyo.me/d/autoquest.js` in any browser, press `Ctrl+A`, then `Ctrl+C`. Or copy it from a terminal:
+1. Copy the script. The console form of every script is at `/d/c/<name>`. Open `https://script.riyo.me/d/c/autoquest` in any browser, press `Ctrl+A`, then `Ctrl+C`. Or copy it from a terminal:
 
    ```powershell
-   irm https://script.riyo.me/d/autoquest.js | scb             # Windows (PowerShell)
+   irm https://script.riyo.me/d/c/autoquest | scb             # Windows (PowerShell)
    ```
    ```sh
-   curl -sL https://script.riyo.me/d/autoquest.js | pbcopy     # macOS
+   curl -sL https://script.riyo.me/d/c/autoquest | pbcopy     # macOS
    ```
 
 2. In Discord, press `Ctrl+Shift+I` (`Cmd+Opt+I` on macOS) and open the **Console** tab.
 3. Paste and press Enter. If the console asks, type `allow pasting` first.
 
-A one-line loader such as `fetch("https://script.riyo.me/d/autoquest")` does not work in Discord's console. Discord's Content Security Policy blocks requests to hosts outside its allowlist, so the full script has to be pasted.
+A one-line loader such as `fetch("https://script.riyo.me/d/c/autoquest")` does not work in Discord's console. Discord's Content Security Policy blocks requests to hosts outside its allowlist, so the full script has to be pasted.
 
 ### From PowerShell (desktop app)
 
 To skip the console entirely, each script has its own one-line runner. It injects the script into the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so the CSP never applies. The `.js` files are unchanged; CDP runs them in the same place the console would.
 
 ```powershell
-irm https://script.riyo.me/d/autoquest | iex     # run autoquest
-irm https://script.riyo.me/d/token | iex         # copy your token to the clipboard
+irm https://script.riyo.me/d/p/autoquest | iex     # run autoquest
+irm https://script.riyo.me/d/p/token | iex         # copy your token to the clipboard
 ```
 
-Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/d/autoquest | iex"`.
+Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/d/p/autoquest | iex"`.
 
 The runner quits Discord (interrupting any call), relaunches it with `--remote-debugging-port=9222`, and runs the script in the main window. The debug port stays open until Discord is restarted normally; while it is open, any local program can run code in your Discord, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`; verify with `irm http://127.0.0.1:9222/json/version` after launch.
 
@@ -81,4 +81,4 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 
 ## Adding a script
 
-Vercel rewrites proxy this repo's `main` branch. `script.riyo.me/d/<name>.js` serves the console source and `script.riyo.me/d/<name>.ps1` the PowerShell runner. The bare `script.riyo.me/d/<name>` runs the script the intended way — the runner for `autoquest`/`token`, the console source otherwise. To publish a script, push `console/<name>.js`; add `powershell/<name>.ps1` (and its bare-URL route in the delivery project's `vercel.json`) for a runner. GitHub's cache can take up to 5 minutes to update.
+Vercel rewrites proxy this repo's `main` branch: `script.riyo.me/d/c/<name>` serves `console/<name>.js` (copy-paste) and `script.riyo.me/d/p/<name>` serves `powershell/<name>.ps1` (run with `| iex`). To publish a script, push `console/<name>.js`; add `powershell/<name>.ps1` for a runner too — no config change needed. GitHub's cache can take up to 5 minutes to update.

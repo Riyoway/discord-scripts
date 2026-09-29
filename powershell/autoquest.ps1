@@ -1,11 +1,11 @@
 # Inject autoquest into the Discord desktop client over the Chrome DevTools Protocol.
 # PowerShell does the fetching, so Discord's CSP never applies.
-#   irm https://script.riyo.me/d/autoquest | iex
+#   irm https://script.riyo.me/d/p/autoquest | iex
 # Self-contained per script; factor the shared CDP block into a helper if these multiply.
 $ErrorActionPreference = "Stop"
 $port = 9222
 Write-Host "Fetching autoquest..." -ForegroundColor Cyan
-$code = Invoke-RestMethod "https://script.riyo.me/d/autoquest.js"
+$code = Invoke-RestMethod "https://script.riyo.me/d/c/autoquest"
 # Wrap in an IIFE so the script's top-level `let`s don't collide when injected twice.
 $expr = "(function(){`n$code`n})()"
 
