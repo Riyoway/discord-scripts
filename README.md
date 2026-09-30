@@ -36,15 +36,15 @@ A one-line loader such as `fetch("https://script.riyo.me/d/c/autoquest")` does n
 
 ### From PowerShell (desktop app)
 
-To skip the console entirely, each script has its own one-line runner. It injects the script into the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so the CSP never applies. The `.js` files are unchanged; CDP runs them in the same place the console would.
+To skip the console entirely, supported scripts have one-line runners. They inject the script into the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so the CSP never applies. The `.js` files are unchanged; CDP runs them in the same place the console would.
 
 ```powershell
 irm https://script.riyo.me/p/menu | iex             # interactive picker (category, then browse / copy / run)
-irm https://script.riyo.me/p/autoquest | iex        # run autoquest
-irm https://script.riyo.me/p/token | iex            # copy your token to the clipboard
+irm https://script.riyo.me/d/p/autoquest | iex      # run autoquest
+irm https://script.riyo.me/d/p/token | iex          # copy your token to the clipboard
 ```
 
-Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/p/autoquest | iex"`.
+Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/d/p/autoquest | iex"`.
 
 The runner quits Discord (interrupting any call), relaunches it with `--remote-debugging-port=9222`, and runs the script in the main window. The debug port stays open until Discord is restarted normally; while it is open, any local program can run code in your Discord, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`; verify with `irm http://127.0.0.1:9222/json/version` after launch.
 
@@ -85,4 +85,4 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 
 ## Adding a script
 
-Vercel rewrites proxy this repo's `main` branch: `script.riyo.me/d/c/<name>` serves `console/<name>.js` (copy-paste) and `script.riyo.me/p/<name>` serves `powershell/<name>.ps1` (run with `| iex`). The old `/d/p/<name>` route remains as an alias. To publish a script, push its source file, then add an entry to `scripts.json` with `category`, `name`, `desc`, `source`, and `github`; add `runner` when a PowerShell runner exists. The library page and menu read that manifest. GitHub's cache can take up to 5 minutes to update.
+Vercel rewrites proxy this repo's `main` branch: `script.riyo.me/d/c/<name>` serves `console/<name>.js` (copy-paste), `script.riyo.me/d/p/<name>` serves `powershell/<name>.ps1` (run with `| iex`), and `/p/menu` serves the shared picker. To publish a script, push its source file, then add an entry to `scripts.json` with `category`, `name`, `desc`, and `source`; add `runner` when a PowerShell runner exists. The library page and menu read that manifest. GitHub's cache can take up to 5 minutes to update.

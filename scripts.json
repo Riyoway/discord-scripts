@@ -1,9 +1,9 @@
 [
-  { "category": "Discord", "name": "autoquest", "desc": "Complete every active Discord Quest automatically.", "source": "/d/c/autoquest", "runner": "/p/autoquest", "github": "https://github.com/Riyoway/discord-scripts/blob/main/console/autoquest.js" },
-  { "category": "Discord", "name": "token", "desc": "Copy your account token to the clipboard.", "source": "/d/c/token", "runner": "/p/token", "github": "https://github.com/Riyoway/discord-scripts/blob/main/console/token.js" },
-  { "category": "Discord", "name": "timestamp", "desc": "Build and copy Discord <t:...> timestamp codes.", "source": "/d/c/timestamp", "github": "https://github.com/Riyoway/discord-scripts/blob/main/console/timestamp.js" },
-  { "category": "Discord", "name": "media", "desc": "Download the images and videos on the open page.", "source": "/d/c/media", "github": "https://github.com/Riyoway/discord-scripts/blob/main/console/media.js" },
-  { "category": "Discord", "name": "whoami", "desc": "Print your account and a server/DM/friend inventory (read-only).", "source": "/d/c/whoami", "github": "https://github.com/Riyoway/discord-scripts/blob/main/console/whoami.js" },
-  { "category": "Discord", "name": "export", "desc": "Save the open DM/channel as a Discord-looking HTML file.", "source": "/d/c/export", "github": "https://github.com/Riyoway/discord-scripts/blob/main/console/export.js" },
-  { "category": "Discord", "name": "snowflake", "desc": "Decode a Discord ID or message link into its creation time.", "source": "/d/c/snowflake", "github": "https://github.com/Riyoway/discord-scripts/blob/main/console/snowflake.js" }
+  { "category": "Discord", "name": "autoquest", "desc": "Complete every active Discord Quest automatically.", "source": "/d/c/autoquest", "runner": "/d/p/autoquest" },
+  { "category": "Discord", "name": "token", "desc": "Copy your account token to the clipboard.", "source": "/d/c/token", "runner": "/d/p/token" },
+  { "category": "Discord", "name": "timestamp", "desc": "Build and copy Discord <t:...> timestamp codes.", "source": "/d/c/timestamp" },
+  { "category": "Discord", "name": "media", "desc": "Download the images and videos on the open page.", "source": "/d/c/media" },
+  { "category": "Discord", "name": "whoami", "desc": "Print your account and a server/DM/friend inventory (read-only).", "source": "/d/c/whoami" },
+  { "category": "Discord", "name": "export", "desc": "Save the open DM/channel as a Discord-looking HTML file.", "source": "/d/c/export" },
+  { "category": "Discord", "name": "snowflake", "desc": "Decode a Discord ID or message link into its creation time.", "source": "/d/c/snowflake" }
 ]
