@@ -7,7 +7,7 @@ Scripts for Discord, served from the [script library](https://script.riyo.me/lib
 | [`autoquest`](console/autoquest.js) | Enrolls in and completes every active Discord Quest, one at a time |
 | [`token`](console/token.js) | Prints your account token |
 | [`timestamp`](console/timestamp.js) | Overlay that builds Discord `<t:…>` timestamp codes and copies them |
-| [`media`](console/media.js) | Downloads the images and videos on the open page (all / images / videos) |
+| [`media`](console/media.js) | Fetches images and videos in the background with progress and Stop, then saves one ZIP |
 | [`whoami`](console/whoami.js) | Prints your account and a server/DM/friend inventory (read-only) |
 | [`export`](console/export.js) | Saves the open DM/channel as a self-contained, Discord-looking HTML file |
 | [`snowflake`](console/snowflake.js) | Decodes an ID or message link into its creation time and a Discord timestamp |
@@ -71,6 +71,12 @@ An icon appears in the top-right corner of the window:
 - Drag the icon to move it.
 - Drag a waiting quest to change its order in the queue.
 - **Pause** holds the queue. **Stop** ends the run and removes every patch.
+
+## media
+
+Choose **Download all**, **Images**, or **Videos** to fetch the media in the background. The panel displays file progress and received bytes. **Stop**, closing the panel, or running the script again aborts the active request and stops the queue. When fetching finishes, click **Save ZIP** to save all successful files in one archive. Nothing is saved automatically and no tabs are opened for failed requests.
+
+Blocked or unavailable URLs are skipped and counted in the result. The ZIP is held in memory until saved; batches are limited to 512 MiB. Choose a smaller batch if you reach the limit.
 
 ## token
 
