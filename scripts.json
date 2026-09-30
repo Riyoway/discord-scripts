@@ -1,9 +1,9 @@
 [
   { "category": "Discord", "name": "autoquest", "desc": "Process supported Discord Quests with pause, stop, and confirmed progress.", "source": "/d/c/autoquest", "runner": "/d/p/autoquest" },
   { "category": "Discord", "name": "token", "desc": "Copy your account token to the clipboard.", "source": "/d/c/token", "runner": "/d/p/token" },
-  { "category": "Discord", "name": "timestamp", "desc": "Build and copy Discord <t:...> timestamp codes.", "source": "/d/c/timestamp" },
-  { "category": "Discord", "name": "media", "desc": "Fetch images and videos with progress and Stop, then save one ZIP.", "source": "/d/c/media" },
-  { "category": "Discord", "name": "whoami", "desc": "Print your account and a server/DM/friend inventory (read-only).", "source": "/d/c/whoami" },
-  { "category": "Discord", "name": "export", "desc": "Save the open DM/channel as a Discord-looking HTML file.", "source": "/d/c/export" },
-  { "category": "Discord", "name": "snowflake", "desc": "Decode a Discord ID or message link into its creation time.", "source": "/d/c/snowflake" }
+  { "category": "Discord", "name": "timestamp", "desc": "Build and copy Discord <t:...> timestamp codes.", "source": "/d/c/timestamp", "runner": "/d/p/timestamp" },
+  { "category": "Discord", "name": "media", "desc": "Fetch images and videos with progress and Stop, then save one ZIP.", "source": "/d/c/media", "runner": "/d/p/media" },
+  { "category": "Discord", "name": "whoami", "desc": "Print your account and a server/DM/friend inventory (read-only).", "source": "/d/c/whoami", "runner": "/d/p/whoami" },
+  { "category": "Discord", "name": "export", "desc": "Save the open DM/channel as a Discord-looking HTML file.", "source": "/d/c/export", "runner": "/d/p/export" },
+  { "category": "Discord", "name": "snowflake", "desc": "Decode a Discord ID or message link into its creation time.", "source": "/d/c/snowflake", "runner": "/d/p/snowflake" }
 ]

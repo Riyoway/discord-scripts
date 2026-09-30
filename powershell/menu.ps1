@@ -5,7 +5,7 @@ $BASE = "https://script.riyo.me"
 
 # One source of truth for the list, grouped by category.
 $raw = (Invoke-WebRequest "$BASE/d/list" -UseBasicParsing).Content
-$scripts = @($raw | ConvertFrom-Json)
+$scripts = @($raw | ConvertFrom-Json | ForEach-Object { $_ })
 if (-not $scripts.Count) { Write-Host "Could not load the script list."; return }
 $categories = @($scripts | Group-Object { if ($_.category) { $_.category } else { "Discord" } })
 

@@ -1,6 +1,6 @@
 # discord-scripts
 
-Scripts for Discord, served from the [script library](https://script.riyo.me/library?=discord). Browse, read, and copy the source there. All scripts have a [`console/`](console) version to paste into DevTools; some have a [`powershell/`](powershell) runner that injects the script into the desktop client.
+Scripts for Discord, served from the [script library](https://script.riyo.me/library?=discord). Browse, read, and copy the source there. All scripts have a [`console/`](console) version to paste into DevTools and a [`powershell/`](powershell) runner for the desktop client.
 
 | Script | What it does |
 | --- | --- |
@@ -36,15 +36,22 @@ A one-line loader such as `fetch("https://script.riyo.me/d/c/autoquest")` does n
 
 ### From PowerShell (desktop app)
 
-To skip the console entirely, supported scripts have one-line runners. They inject the script into the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so the CSP never applies. The `.js` files are unchanged; CDP runs them in the same place the console would.
+Every script has a one-line runner using the shared `powershell/run.ps1` injector. It runs the script in the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so Discord's CSP does not block loading the source. Network requests made by the injected script still follow the client's CSP.
 
 ```powershell
 irm https://script.riyo.me/p/menu | iex             # interactive picker (category, then browse / copy / run)
 irm https://script.riyo.me/d/p/autoquest | iex      # run autoquest
 irm https://script.riyo.me/d/p/token | iex          # copy your token to the clipboard
+irm https://script.riyo.me/d/p/timestamp | iex      # open the timestamp panel
+irm https://script.riyo.me/d/p/media | iex          # open the media downloader
+irm https://script.riyo.me/d/p/whoami | iex         # print account and server inventory here
+irm https://script.riyo.me/d/p/export | iex         # open the channel export panel
+irm https://script.riyo.me/d/p/snowflake | iex      # enter an ID here and copy its timestamp
 ```
 
 Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/d/p/autoquest | iex"`.
+
+Offline runner check: `powershell -File tests/powershell.test.ps1`. This checks registration, syntax, and terminal input/output without launching Discord.
 
 The runner quits Discord (interrupting any call), relaunches it with `--remote-debugging-port=9222`, and runs the script in the main window. The debug port stays open until Discord is restarted normally; while it is open, any local program can run code in your Discord, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`; verify with `irm http://127.0.0.1:9222/json/version` after launch.
 
