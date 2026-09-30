@@ -1,5 +1,5 @@
 [
-  { "category": "Discord", "name": "autoquest", "desc": "Complete every active Discord Quest automatically.", "source": "/d/c/autoquest", "runner": "/d/p/autoquest" },
+  { "category": "Discord", "name": "autoquest", "desc": "Process supported Discord Quests with pause, stop, and confirmed progress.", "source": "/d/c/autoquest", "runner": "/d/p/autoquest" },
   { "category": "Discord", "name": "token", "desc": "Copy your account token to the clipboard.", "source": "/d/c/token", "runner": "/d/p/token" },
   { "category": "Discord", "name": "timestamp", "desc": "Build and copy Discord <t:...> timestamp codes.", "source": "/d/c/timestamp" },
   { "category": "Discord", "name": "media", "desc": "Fetch images and videos with progress and Stop, then save one ZIP.", "source": "/d/c/media" },

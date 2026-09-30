@@ -4,7 +4,7 @@ Scripts for Discord, served from the [script library](https://script.riyo.me/lib
 
 | Script | What it does |
 | --- | --- |
-| [`autoquest`](console/autoquest.js) | Enrolls in and completes every active Discord Quest, one at a time |
+| [`autoquest`](console/autoquest.js) | Processes supported Discord Quests in a queue with confirmed progress, Pause, and Stop |
 | [`token`](console/token.js) | Prints your account token |
 | [`timestamp`](console/timestamp.js) | Overlay that builds Discord `<t:…>` timestamp codes and copies them |
 | [`media`](console/media.js) | Fetches images and videos in the background with progress and Stop, then saves one ZIP |
@@ -59,7 +59,7 @@ DevTools is disabled in the desktop app by default. To enable it, add this line 
 Supported task types:
 
 - `WATCH_VIDEO`, `WATCH_VIDEO_ON_MOBILE`
-- `PLAY_ON_DESKTOP`: desktop app only. The game is spoofed; nothing is installed.
+- `PLAY_ON_DESKTOP`: uses the desktop client's game store when available; otherwise sends application heartbeats. Server eligibility still applies. Nothing is installed.
 - `STREAM_ON_DESKTOP`: desktop app only. You must be streaming any window in a voice channel.
 - `PLAY_ON_XBOX`, `PLAY_ON_PLAYSTATION`
 - `PLAY_ACTIVITY`
@@ -70,7 +70,17 @@ An icon appears in the top-right corner of the window:
 - Hover over it to show the queue. Click it to pin the panel open.
 - Drag the icon to move it.
 - Drag a waiting quest to change its order in the queue.
-- **Pause** holds the queue. **Stop** ends the run and removes every patch.
+- **Pause** holds the queue and restores any game/stream patches until resumed.
+- **Stop** cancels waiting immediately, restores this run's patches, and prevents further progress requests. An already-sent internal Discord request cannot be recalled.
+- Running the script again stops the previous run first. Reload Discord once if an older version is already running.
+
+The queue refreshes Discord's quest list, skips previews and inactive quests, and uses separate enrollment locations for video on mobile and desktop tasks. Completion is shown only after Discord confirms it; otherwise the result is **Pending confirmation**. Claim rewards manually in Discord.
+
+Rate limits respect Discord's retry delay, with at most three retries. Game/activity tasks fail after three minutes without progress (time spent paused is excluded). CAPTCHA requirements are shown for manual resolution. Activity achievements depend on Discord's authorization and browser CSP/CORS permissions; failed or stopped runs remove newly created authorizations when possible, preserving existing grants.
+
+The protocol and state handling were compared with the local `discord-quest-auto-complete-bot` project. Its account runner, token handling, and CAPTCHA providers are not part of this script.
+
+Run the offline regression check with `node tests/autoquest.test.cjs`. It uses a simulated Discord client and makes no account or network requests.
 
 ## media
 
