@@ -118,4 +118,6 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 
 ## Adding a script
 
+For client compatibility work, consult [Discord Client Internals](https://github.com/Riyoway/discord-client-internals) (private repository). Its offline `index.html` documents store/HTTP lookup fingerprints with captured build numbers and hashes. Run its collector on the affected build before changing module selectors; a lookup snapshot alone is not an end-to-end script test.
+
 Vercel rewrites proxy this repo's `main` branch: `script.riyo.me/d/c/<name>` serves `console/<name>.js` (copy-paste), `script.riyo.me/d/p/<name>` serves `powershell/<name>.ps1` (run with `| iex`), and `/p/menu` serves the shared picker. To publish a script, push its source file, then add an entry to `scripts.json` with `category`, `name`, `desc`, and `source`; add `runner` when a PowerShell runner exists. The library page and menu read that manifest. GitHub's cache can take up to 5 minutes to update.
