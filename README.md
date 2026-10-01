@@ -95,6 +95,8 @@ Choose **Download all**, **Images**, or **Videos** to fetch the media in the bac
 
 Blocked or unavailable URLs are skipped and counted in the result. The ZIP is held in memory until saved; batches are limited to 512 MiB. Choose a smaller batch if you reach the limit.
 
+Archive entries retain filenames from response headers or URLs, with a numeric prefix to avoid collisions. Missing or mismatched media extensions are corrected using the response type or common file signatures. Unidentified files without an extension use `.bin`.
+
 ## token
 
 Prints your account token as the console result.

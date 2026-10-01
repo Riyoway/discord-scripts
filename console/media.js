@@ -21,10 +21,45 @@
             .filter(Boolean)
     )];
     const imgs = collect("img"), vids = collect("video");
-    const fileName = (url, index) => {
+    const extensions = {
+        "image/jpeg": "jpg", "image/png": "png", "image/gif": "gif", "image/webp": "webp",
+        "image/avif": "avif", "image/svg+xml": "svg", "image/bmp": "bmp",
+        "video/mp4": "mp4", "video/webm": "webm", "video/quicktime": "mov",
+        "video/ogg": "ogv", "video/x-matroska": "mkv", "video/x-msvideo": "avi"
+    };
+    const fileName = (url, index, response, signature = new Uint8Array()) => {
         let base = "";
-        try { base = decodeURIComponent(new URL(url).pathname.split("/").pop() || ""); } catch {}
-        base = Array.from(base.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_")).slice(0, 180).join("");
+        const disposition = response?.headers.get("Content-Disposition") || "";
+        const encoded = disposition.match(/filename\*\s*=\s*UTF-8''([^;]+)/i);
+        try { if (encoded) base = decodeURIComponent(encoded[1].trim()); } catch {}
+        if (!base) base = disposition.match(/filename\s*=\s*(?:"([^"]*)"|([^;]*))/i)?.slice(1).find(value => value !== undefined)?.trim() || "";
+        if (!base) {
+            try {
+                const source = new URL(response?.url || url);
+                base = source.searchParams.get("filename") || source.searchParams.get("file_name") || decodeURIComponent(source.pathname.split("/").pop() || "");
+            } catch {}
+        }
+        base = base.replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/[. ]+$/, "");
+        const type = response?.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase();
+        let extension = extensions[type];
+        // Some CDNs return application/octet-stream; inspect common image/video signatures.
+        const ascii = (start, end) => String.fromCharCode(...signature.subarray(start, end));
+        if (!extension) {
+            if (signature[0] === 0xff && signature[1] === 0xd8 && signature[2] === 0xff) extension = "jpg";
+            else if (ascii(0, 8) === "\x89PNG\r\n\x1a\n") extension = "png";
+            else if (["GIF87a", "GIF89a"].includes(ascii(0, 6))) extension = "gif";
+            else if (ascii(0, 4) === "RIFF" && ascii(8, 12) === "WEBP") extension = "webp";
+            else if (ascii(4, 8) === "ftyp") extension = ["avif", "avis"].includes(ascii(8, 12)) ? "avif" : ascii(8, 12) === "qt  " ? "mov" : "mp4";
+        }
+        const suffix = base.match(/\.([a-z0-9]{1,10})$/i)?.[1];
+        if (extension && suffix?.toLowerCase() !== extension && !(extension === "jpg" && suffix?.toLowerCase() === "jpeg")) {
+            if (suffix && Object.values(extensions).includes(suffix.toLowerCase())) base = base.slice(0, -suffix.length - 1);
+            base = Array.from(base || "media").slice(0, 170).join("") + "." + extension;
+        } else if (!suffix && response) base = Array.from(base || "media").slice(0, 170).join("") + ".bin";
+        else {
+            const ending = suffix ? "." + suffix : "";
+            base = Array.from(ending ? base.slice(0, -ending.length) : base).slice(0, 170).join("") + ending;
+        }
         return `${String(index + 1).padStart(4, "0")}-${base || "media"}`;
     };
     const crcTable = Uint32Array.from({ length: 256 }, (_, n) => {
@@ -171,8 +206,7 @@
         try {
             for (let i = 0; i < urls.length; i++) {
                 signal.throwIfAborted();
-                const name = fileName(urls[i], i);
-                status.textContent = `Fetching ${i + 1}/${urls.length}: ${name}`;
+                status.textContent = `Fetching ${i + 1}/${urls.length}: ${fileName(urls[i], i)}`;
                 try {
                     const response = await fetch(urls[i], { signal });
                     if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -199,7 +233,10 @@
                         reader.releaseLock();
                     }
                     signal.throwIfAborted();
-                    files.push({ name, blob: new Blob(chunks), crc: (crc ^ 0xffffffff) >>> 0 });
+                    const blob = new Blob(chunks);
+                    const signature = new Uint8Array(await blob.slice(0, 16).arrayBuffer());
+                    signal.throwIfAborted();
+                    files.push({ name: fileName(urls[i], i, response, signature), blob, crc: (crc ^ 0xffffffff) >>> 0 });
                 } catch (error) {
                     if (signal.aborted || error instanceof RangeError) throw error;
                     failed++;

@@ -18,6 +18,11 @@ const server = http.createServer((req, res) => {
         res.on("close", () => { if (!res.writableEnded) aborted++; });
         return;
     }
+    if (req.url === "/video") res.setHeader("Content-Type", "video/mp4");
+    if (req.url === "/download") res.setHeader("Content-Disposition", "attachment; filename*=UTF-8''holiday%20%E6%97%A5%E6%9C%AC.mp4");
+    if (req.url === "/wrong.png") res.setHeader("Content-Type", "video/webm; charset=binary");
+    if (req.url === "/long") res.setHeader("Content-Disposition", 'attachment; filename="' + "a".repeat(200) + '.mp4"');
+    if (req.url === "/opaque") { res.end(Buffer.from([0, 0, 0, 24, ...Buffer.from("ftypisom")])); return; }
     res.writeHead(200, { "Content-Length": payload.length });
     res.end(payload);
 });
@@ -113,6 +118,23 @@ function checkZip(bytes) {
         checkZip(Buffer.from(await complete.downloads[0].arrayBuffer()));
         complete.node("x").onclick();
 
+        const naming = harness(base, [], ["/video", "/download", "/wrong.png", "/query?filename=holiday.mp4", "/long", "/opaque", "/unknown"]);
+        await naming.node("vid").onclick();
+        naming.node("save").onclick();
+        const archive = Buffer.from(await naming.downloads[0].arrayBuffer());
+        let central = archive.readUInt32LE(archive.length - 6);
+        const names = [];
+        for (let i = 0; i < 7; i++) {
+            const length = archive.readUInt16LE(central + 28);
+            names.push(archive.subarray(central + 46, central + 46 + length).toString("utf8"));
+            central += 46 + length;
+        }
+        assert.deepEqual(names.slice(0, 4), ["0001-video.mp4", "0002-holiday 日本.mp4", "0003-wrong.webm", "0004-holiday.mp4"]);
+        assert(names[4].endsWith(".mp4") && names[4].length < 190);
+        assert.equal(names[5], "0006-opaque.mp4");
+        assert.equal(names[6], "0007-unknown.bin");
+        naming.node("x").onclick();
+
         for (const action of ["stop", "x", "toggle"]) {
             requests = [];
             const before = aborted;
@@ -137,7 +159,7 @@ function checkZip(bytes) {
         assert.equal(failed.node("save").hidden, true);
         assert.equal(failed.downloads.length, 0);
         failed.node("x").onclick();
-        console.log("PASS: ZIP integrity, Unicode/duplicate names, failed URLs, single queue, progress, Stop, close, and toggle.");
+        console.log("PASS: ZIP integrity, MIME/header/query/signature filenames, long/Unicode/duplicate names, failed URLs, single queue, progress, Stop, close, and toggle.");
     } finally {
         server.closeAllConnections();
         await new Promise((resolve) => server.close(resolve));
