@@ -135,6 +135,8 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 
 ## Adding a script
 
+Overlay scripts share the black glass theme and inline SVG icons in `ui/theme.js`. After editing it, run `node scripts/sync-ui.cjs` to embed the updated assets in AutoQuest, Media, Search, Timestamp, Export, and Snowflake. Each published console script remains standalone and loads no UI assets from external hosts. Use `node scripts/sync-ui.cjs --check` to detect stale copies. Snowflake uses the panel in DevTools and retains terminal input/output in desktop runners.
+
 For client compatibility work, consult [Discord Client Internals](https://github.com/Riyoway/discord-client-internals) (private repository). Its offline `index.html` documents store/HTTP lookup fingerprints with captured build numbers and hashes. Run its collector on the affected build before changing module selectors; a lookup snapshot alone is not an end-to-end script test.
 
 Vercel rewrites proxy this repo's `main` branch: `/d/c/<name>` serves `console/<name>.js`, `/d/p/<name>` serves `powershell/<name>.ps1`, and `/p/menu` serves the PowerShell picker. `/d/m/<name>` serves `macos/<name>.sh`; these wrappers call the shared loader at `/d/m/run`. `/m/menu` also serves that loader, which downloads `macos/run.js` from `/d/m/client`. To publish a script, push its source file and named runners, then add an entry to `scripts.json` with `category`, `name`, `desc`, and `source`; add `runner` when a desktop runner exists. Discord entries automatically appear in the macOS picker. The library page and menus read that manifest. GitHub's cache can take up to 5 minutes to update.

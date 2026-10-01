@@ -1,5 +1,59 @@
 // AutoQuest — client-side queue, with protocol/state handling informed by the local quest bot.
 (async () => {
+    // BEGIN SHARED UI
+    // Embedded by scripts/sync-ui.cjs so every console script works without remote UI assets.
+    const riyoIcon = name => {
+        const paths = {
+            close: '<path d="m18 6-12 12M6 6l12 12"/>',
+            download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
+            image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/>',
+            video: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m10 9 5 3-5 3Z"/>',
+            search: '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+            clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+            quest: '<path d="m14.5 17.5 3 3L21 17l-3-3M13 19l6-6M3 3l3 .5L18 15l-3 3L3.5 6Zm.5 17.5L7 17l-3-3L1 17M5 19l6-6M14 6l4.5-2.5L21 3l-.5 3L18 10"/>',
+            pause: '<path d="M9 4H5v16h4zM19 4h-4v16h4z"/>',
+            play: '<path d="m7 4 14 8-14 8Z"/>',
+            stop: '<rect x="5" y="5" width="14" height="14" rx="2"/>',
+            copy: '<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/>',
+            pin: '<path d="m16 3 5 5-4 1-4 4-1 4-5-5 4-1 4-4ZM9 15l-6 6"/>'
+        };
+        return `<svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.copy}</svg>`;
+    };
+    const riyoTheme = `<style>
+    .riyo-ui{--riyo-surface:rgba(0,0,0,.76);--riyo-line:rgba(255,255,255,.14);--riyo-text:#f5f5f5;--riyo-muted:#b3b3b3;--riyo-danger:#ff9090;color-scheme:dark;font:13px/1.5 'gg sans',system-ui,sans-serif;color:var(--riyo-text)}
+    .riyo-panel,.riyo-ui .autoquest-panel{box-sizing:border-box;width:360px;max-width:calc(100vw - 32px);max-height:calc(100dvh - 96px);padding:18px;background:var(--riyo-surface);backdrop-filter:blur(28px);-webkit-backdrop-filter:blur(28px);border:1px solid var(--riyo-line);border-radius:18px;box-shadow:0 16px 56px #0007,inset 0 1px 0 #ffffff08;overflow:auto}
+    .riyo-panel{position:fixed;top:72px;right:16px;z-index:10000;display:flex;flex-direction:column;gap:14px}
+    .riyo-ui *{box-sizing:border-box;scrollbar-width:none}.riyo-ui ::-webkit-scrollbar,.riyo-ui::-webkit-scrollbar{display:none}
+    .riyo-ui .riyo-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:14px;border-bottom:1px solid var(--riyo-line);flex-shrink:0}
+    .riyo-ui .riyo-title{display:flex;align-items:center;gap:10px;font-size:15px;font-weight:650;letter-spacing:-.2px;margin:0;color:var(--riyo-text)}
+    .riyo-ui svg{display:inline-block;flex-shrink:0;vertical-align:middle;pointer-events:none}
+    .riyo-ui button{font:inherit;font-weight:550;display:inline-flex;justify-content:center;align-items:center;gap:8px;min-height:36px;padding:8px 12px;border:1px solid var(--riyo-line);border-radius:10px;background:rgba(255,255,255,.065);color:var(--riyo-text);cursor:pointer;transition:background .15s,border-color .15s}
+    .riyo-ui button:hover{background:rgba(255,255,255,.13);border-color:#ffffff40}.riyo-ui button:active{background:#ffffff20}.riyo-ui button:disabled{opacity:.4;cursor:default}
+    .riyo-ui .riyo-primary{background:#f5f5f5;color:#111;border-color:#f5f5f5}.riyo-ui .riyo-primary:hover{background:#dedede;border-color:#dedede}
+    .riyo-ui .riyo-danger{background:#ff909010;color:var(--riyo-danger);border-color:#ff909040}.riyo-ui .riyo-danger:hover{background:#ff909024}
+    .riyo-ui .riyo-close{width:32px;min-height:32px;padding:6px;background:transparent;flex-shrink:0;border-color:transparent}
+    .riyo-ui input{font:inherit;color:var(--riyo-text);min-width:0;border:1px solid var(--riyo-line);border-radius:10px;background:#ffffff06;padding:9px 11px}
+    .riyo-ui input:not([type=checkbox]){width:100%;min-height:38px}.riyo-ui input::placeholder{color:#969696}.riyo-ui input[type=checkbox]{accent-color:#fff;width:15px;height:15px;margin:0}
+    .riyo-ui :focus-visible{outline:2px solid #fff;outline-offset:3px}
+    .riyo-ui .riyo-muted,.riyo-ui .riyo-status{font-size:12px;color:var(--riyo-muted);overflow-wrap:anywhere}.riyo-ui .riyo-status{padding:11px 12px;border:1px solid #ffffff0c;border-radius:10px;background:#ffffff04}
+    .riyo-ui .riyo-row{display:flex;gap:8px;align-items:center}.riyo-ui .riyo-row>button{flex:1}.riyo-ui .riyo-options{display:flex;flex-wrap:wrap;gap:10px;align-items:center}.riyo-ui label{font-size:12px;color:var(--riyo-muted)}
+    .riyo-ui .riyo-label{display:flex;flex-direction:column;gap:7px}.riyo-ui .riyo-check{display:flex;align-items:center;gap:7px}
+    .riyo-ui progress{appearance:none;display:block;width:100%;height:6px;border:0;border-radius:99px;overflow:hidden;background:#ffffff14;flex-shrink:0}
+    .riyo-ui progress::-webkit-progress-bar{background:#ffffff14;border-radius:99px}.riyo-ui progress::-webkit-progress-value{background:#eee;border-radius:99px;transition:width .2s}.riyo-ui progress::-moz-progress-bar{background:#eee;border-radius:99px}
+    .riyo-ui [hidden]{display:none!important}
+    .riyo-ui .riyo-badge{font-size:11px;font-weight:550;padding:3px 8px;border:1px solid var(--riyo-line);border-radius:99px;white-space:nowrap}
+    .riyo-ui .autoquest-panel{position:absolute;top:52px;right:0;display:none;opacity:0;transition:opacity .15s;pointer-events:auto}
+    .riyo-ui .autoquest-icon{width:40px;height:40px;padding:0;border-radius:12px;background:var(--riyo-surface);backdrop-filter:blur(28px);box-shadow:0 4px 20px #0005}
+    .riyo-ui .autoquest-icon[aria-pressed=true]{background:#f5f5f5;color:#111}.riyo-ui .autoquest-queue{max-height:320px;overflow:auto;margin-top:14px}
+    .riyo-ui .autoquest-item{padding:12px;margin-bottom:8px;border:1px solid #ffffff0d;background:#ffffff04;border-radius:12px}.riyo-ui .autoquest-item[data-current=true]{border-color:#ffffff40;background:#ffffff09}.riyo-ui .autoquest-item[data-done=true]{opacity:.55}
+    .riyo-ui .autoquest-item.drag-over{outline:1px dashed #eee;background:#ffffff14}.riyo-ui .riyo-quest-name{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.riyo-ui .riyo-quest-meta{display:flex;justify-content:space-between;gap:10px;margin-top:5px;font-size:12px;color:var(--riyo-muted);pointer-events:none}
+    .riyo-ui .riyo-progress{height:6px;background:#ffffff14;border-radius:99px;margin-top:10px;overflow:hidden}.riyo-ui .riyo-progress>div{height:100%;background:#eee;border-radius:99px;transition:width .3s}.riyo-ui .riyo-footer{display:flex;gap:8px;padding-top:14px;margin-top:6px;border-top:1px solid var(--riyo-line)}.riyo-ui .riyo-footer>button:first-child{flex:1}
+    .riyo-ui #search-results-list{overflow:auto;min-height:0}.riyo-ui #search-results-list article{padding:12px;border:1px solid #ffffff14;border-radius:12px;margin-bottom:8px;overflow-wrap:anywhere}.riyo-ui #search-results-list p{margin:6px 0 0;white-space:pre-wrap}.riyo-ui #search-results-list mark{background:#eee;color:#111;border-radius:3px}
+    .riyo-ui .ts-row{width:100%;justify-content:space-between;text-align:left}.riyo-ui #ts-list{display:flex;flex-direction:column;gap:6px}.riyo-ui .ts-code{font:12px ui-monospace,monospace}.riyo-ui .ts-format{color:var(--riyo-muted);font-size:11px}
+    @media(max-width:480px){.riyo-panel{right:12px;max-width:calc(100vw - 24px);padding:16px}.riyo-ui .autoquest-panel{max-width:calc(100vw - 32px);padding:16px}.riyo-ui button{min-height:40px}}
+    @media(prefers-reduced-motion:reduce){.riyo-ui *{transition:none!important;animation:none!important}}
+    </style>`;
+    // END SHARED UI
     const previous = window.__riyoAutoQuest;
     if (previous) {
         previous.stop();
@@ -176,18 +230,19 @@
 
             container = document.createElement('div');
             container.id = 'autoquest-overlay';
-            container.style = "position: fixed; top: 20px; right: 20px; z-index: 10000; font-family: 'gg sans', 'Noto Sans', sans-serif; width: 40px; height: 40px;";
+            container.className = 'riyo-ui';
+            container.style = "position:fixed;top:20px;right:16px;z-index:10000;width:40px;height:40px";
 
             const icon = document.createElement('button');
             icon.type = 'button';
             icon.setAttribute('aria-label', 'Pin AutoQuest monitor');
             icon.className = 'autoquest-icon';
-            icon.style = "width: 40px; height: 40px; background: #1e1f22; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); transition: transform 0.2s;";
-            icon.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" height="24px" viewBox="0 -960 960 960" width="24px" fill="#e3e3e3"><path d="M762-96 645-212l-88 88-28-28q-23-23-23-57t23-57l169-169q23-23 57-23t57 23l28 28-88 88 116 117q12 12 12 28t-12 28l-50 50q-12 12-28 12t-28-12Zm118-628L426-270l5 4q23 23 23 57t-23 57l-28 28-88-88L198-96q-12 12-28 12t-28-12l-50-50q-12-12-12-28t12-28l116-117-88-88 28-28q23-23 57-23t57 23l4 5 454-454h160v160ZM334-583l24-23 23-24-23 24-24 23Zm-56 57L80-724v-160h160l198 198-57 56-174-174h-47v47l174 174-56 57Zm92 199 430-430v-47h-47L323-374l47 47Zm0 0-24-23-23-24 23 24 24 23Z"/></svg>`;
+            icon.setAttribute('aria-pressed', 'false');
+            icon.innerHTML = riyoIcon('quest');
 
             const panel = document.createElement('div');
             panel.className = 'autoquest-panel';
-            panel.style = "position: absolute; top: 48px; right: 0; width: 280px; background: rgba(30, 31, 34, 0.95); backdrop-filter: blur(8px); border-radius: 8px; border: 1px solid rgba(255,255,255,0.1); box-shadow: 0 8px 32px rgba(0,0,0,0.5); padding: 16px; color: #dbdee1; display: none; opacity: 0; transition: opacity 0.3s; pointer-events: auto;";
+            panel.style.display = 'none';
 
             container.onmouseenter = () => {
                 panel.style.display = 'block';
@@ -204,7 +259,7 @@
             icon.onclick = (e) => {
                 e.stopPropagation();
                 OverlayUI.state.isSticky = !OverlayUI.state.isSticky;
-                icon.style.background = OverlayUI.state.isSticky ? "#5865f2" : "#1e1f22";
+                icon.setAttribute('aria-pressed', String(OverlayUI.state.isSticky));
                 OverlayUI.update();
             };
 
@@ -255,17 +310,18 @@
             if (!panel) return;
 
             const { quests, currentIdx, progress, percent, isRunning, isPaused, isSticky, overall } = OverlayUI.state;
-            let html = `<div style="font-size: 14px; font-weight: bold; color: #fff; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                <span>AutoQuest Monitor ${isSticky ? '📌' : ''}</span>
-                <span style="font-size: 10px; color: ${overall === 'ERROR' ? '#ED4245' : isPaused ? '#FAA61A' : '#43B581'}">${isPaused ? 'PAUSED' : overall}</span>
-            </div>`;
+            const label = isPaused ? 'Paused' : overall.charAt(0) + overall.slice(1).toLowerCase();
+            let html = `${riyoTheme}<header class="riyo-header">
+                <strong class="riyo-title">${riyoIcon('quest')}AutoQuest ${isSticky ? riyoIcon('pin') : ''}</strong>
+                <span class="riyo-badge" role="status" style="color:${overall === 'ERROR' ? '#ff9090' : isPaused ? '#e5c380' : '#bce4c8'}">${label}</span>
+            </header>`;
 
-            html += `<div class="autoquest-queue" style="max-height: 320px; overflow-y: auto; padding-right: 4px;">`;
+            html += `<div class="autoquest-queue">`;
 
             if (overall === "ERROR") {
-                html += `<div role="alert" style="font-size: 12px; color: #ED4245; overflow-wrap: anywhere;">${escapeHtml(progress || "Unknown error")}</div>`;
+                html += `<div class="riyo-status" role="alert" style="color:var(--riyo-danger)">${escapeHtml(progress || "Unknown error")}</div>`;
             } else if (quests.length === 0) {
-                html += `<div style="font-size: 12px; color: #b5bac1;">No active quests.</div>`;
+                html += `<div class="riyo-status">No active quests.</div>`;
             } else {
                 quests.forEach((q, i) => {
                     // Read confirmed completion from Discord's current store.
@@ -273,16 +329,15 @@
                     const isDone = !!q.userStatus?.completedAt || !!freshQuest?.userStatus?.completedAt;
                     const isCurrent = i === currentIdx && !isDone;
                     html += `
-                        <div class="autoquest-item" draggable="${isRunning && !isDone && i > currentIdx}" data-index="${i}" style="margin-bottom: 10px; padding: 10px; background: ${isCurrent ? 'rgba(88, 101, 242, 0.1)' : 'rgba(255,255,255,0.03)'}; border-radius: 6px; border-left: 3px solid ${isCurrent ? '#5865f2' : (isDone ? '#43b581' : 'transparent')}; opacity: ${isDone ? '0.5' : '1'}; cursor: ${isRunning && !isDone && i > currentIdx ? 'grab' : 'default'}; transition: background 0.2s;">
-                            <div style="font-size: 12px; font-weight: bold; color: ${isCurrent ? '#fff' : '#dbdee1'}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; pointer-events: none;">${escapeHtml(q.config.messages.questName)}</div>
-                            <div style="font-size: 11px; margin-top: 4px; color: ${isCurrent ? '#949cf7' : '#80848e'}; display: flex; justify-content: space-between; pointer-events: none;">
+                        <div class="autoquest-item" draggable="${isRunning && !isDone && i > currentIdx}" data-index="${i}" data-current="${isCurrent}" data-done="${isDone}" style="cursor:${isRunning && !isDone && i > currentIdx ? 'grab' : 'default'}">
+                            <div class="riyo-quest-name">${escapeHtml(q.config.messages.questName)}</div>
+                            <div class="riyo-quest-meta">
                                 <span>${escapeHtml(isCurrent ? (progress || 'Processing...') : (isDone ? 'Completed' : (q.result || 'Waiting...')))}</span>
                                 ${isCurrent ? `<span>${Math.round(percent)}%</span>` : ''}
                             </div>
                             ${isCurrent ? `
-                                <div style="height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 8px; overflow: hidden; position: relative;">
-                                    <div style="width: ${percent}%; height: 100%; background: #5865f2; transition: width 0.3s ease; box-shadow: 0 0 8px #5865f2;"></div>
-                                    ${percent === 0 || isPaused ? '<div style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent); animation: autoquest-pulse 1.5s infinite;"></div>' : ''}
+                                <div class="riyo-progress" role="progressbar" aria-label="Quest progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(percent)}">
+                                    <div style="width:${percent}%"></div>
                                 </div>
                             ` : ''}
                         </div>
@@ -292,15 +347,10 @@
             html += `</div>`;
 
             html += `
-                <div style="margin-top: 16px; display: flex; gap: 8px;">
-                    <button id="autoquest-btn-pause" style="flex: 1; padding: 6px; border-radius: 4px; border: none; background: ${isPaused ? '#43B581' : '#4f545c'}; color: white; font-size: 11px; cursor: pointer; font-weight: bold;">${isPaused ? 'Resume' : 'Pause'}</button>
-                    <button id="autoquest-btn-stop" style="padding: 6px 12px; border-radius: 4px; border: none; background: #ED4245; color: white; font-size: 11px; cursor: pointer; font-weight: bold;">Stop</button>
+                <div class="riyo-footer">
+                    <button id="autoquest-btn-pause">${riyoIcon(isPaused ? 'play' : 'pause')}${isPaused ? 'Resume' : 'Pause'}</button>
+                    <button id="autoquest-btn-stop" class="riyo-danger">${riyoIcon('stop')}Stop</button>
                 </div>
-                <style>
-                    .autoquest-queue::-webkit-scrollbar { width: 4px; }
-                    .autoquest-queue::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
-                    .autoquest-item.drag-over { background: rgba(88, 101, 242, 0.2) !important; outline: 1px dashed #5865f2; }
-                </style>
             `;
 
             panel.innerHTML = html;
