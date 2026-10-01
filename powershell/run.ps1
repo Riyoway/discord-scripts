@@ -49,38 +49,38 @@ try {
     $connectCancellation = [Threading.CancellationTokenSource]::new(5000)
     try { $ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $connectCancellation.Token).GetAwaiter().GetResult() }
     finally { $connectCancellation.Dispose() }
-function Invoke-Cdp($id, $e, $timeoutMs = 8000) {
-    $cts = [Threading.CancellationTokenSource]::new($timeoutMs)
-    try {
-        $msg = @{ id = $id; method = "Runtime.evaluate"; params = @{ expression = $e; userGesture = $true; awaitPromise = $false; returnByValue = $true } } | ConvertTo-Json -Compress -Depth 5
-        $b = [Text.Encoding]::UTF8.GetBytes($msg)
-        $ws.SendAsync([ArraySegment[byte]]::new($b), 'Text', $true, $cts.Token).Wait()
-        while ($true) {
-            $buffer = [IO.MemoryStream]::new()
-            try {
-                do {
-                    $seg = [ArraySegment[byte]]::new([byte[]]::new(16384))
-                    $r = $ws.ReceiveAsync($seg, $cts.Token); $r.Wait()
-                    if ($r.Result.MessageType -eq 'Close') { throw 'Discord closed the debug socket.' }
-                    $buffer.Write($seg.Array, 0, $r.Result.Count)
-                } while (-not $r.Result.EndOfMessage)
-                $o = [Text.Encoding]::UTF8.GetString($buffer.ToArray()) | ConvertFrom-Json
-            } finally { $buffer.Dispose() }
-            if ($o.id -eq $id) { return $o }
-        }
-    } catch { return $null } finally { $cts.Dispose() }
-}
+    function Invoke-Cdp($id, $e, $timeoutMs = 8000) {
+        $cts = [Threading.CancellationTokenSource]::new($timeoutMs)
+        try {
+            $msg = @{ id = $id; method = "Runtime.evaluate"; params = @{ expression = $e; userGesture = $true; awaitPromise = $false; returnByValue = $true } } | ConvertTo-Json -Compress -Depth 5
+            $b = [Text.Encoding]::UTF8.GetBytes($msg)
+            $ws.SendAsync([ArraySegment[byte]]::new($b), 'Text', $true, $cts.Token).Wait()
+            while ($true) {
+                $buffer = [IO.MemoryStream]::new()
+                try {
+                    do {
+                        $seg = [ArraySegment[byte]]::new([byte[]]::new(16384))
+                        $r = $ws.ReceiveAsync($seg, $cts.Token); $r.Wait()
+                        if ($r.Result.MessageType -eq 'Close') { throw 'Discord closed the debug socket.' }
+                        $buffer.Write($seg.Array, 0, $r.Result.Count)
+                    } while (-not $r.Result.EndOfMessage)
+                    $o = [Text.Encoding]::UTF8.GetString($buffer.ToArray()) | ConvertFrom-Json
+                } finally { $buffer.Dispose() }
+                if ($o.id -eq $id) { return $o }
+            }
+        } catch { return $null } finally { $cts.Dispose() }
+    }
 
-# The renderer may still be booting; wait for its webpack registry before injecting.
-$ready = $false
-for ($i = 0; $i -lt 20; $i++) {
-    if ((Invoke-Cdp $i "typeof webpackChunkdiscord_app" 3000).result.result.value -eq 'object') { $ready = $true; break }
-    Start-Sleep 1
-}
-if (-not $ready) { throw "Discord did not finish loading. Log in and try again." }
+    # The renderer may still be booting; wait for its webpack registry before injecting.
+    $ready = $false
+    for ($i = 0; $i -lt 20; $i++) {
+        if ((Invoke-Cdp $i "typeof webpackChunkdiscord_app" 3000).result.result.value -eq 'object') { $ready = $true; break }
+        Start-Sleep 1
+    }
+    if (-not $ready) { throw "Discord did not finish loading. Log in and try again." }
 
-Write-Host "Injecting..." -ForegroundColor Cyan
-$reply = Invoke-Cdp 100 $expr
+    Write-Host "Injecting..." -ForegroundColor Cyan
+    $reply = Invoke-Cdp 100 $expr
 } finally { $ws.Dispose() }
 if (-not $reply) { throw "Timed out waiting for Discord to run the script." }
 if ($reply.result.exceptionDetails) {
