@@ -110,7 +110,10 @@ function startDiscord() {
     selected.processes.forEach(app => {
         if (!app.terminate) throw new Error('Could not quit Discord. Quit it manually and try again.');
     });
-    for (let i = 0; i < 20 && selected.processes.some(app => !app.terminated); i++) delay(0.5);
+    // AppKit refreshes termination state only when the main run loop advances.
+    for (let i = 0; i < 20 && selected.processes.some(app => !app.terminated); i++) {
+        $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.5));
+    }
     if (selected.processes.some(app => !app.terminated)) throw new Error('Discord did not quit. Quit it manually and try again.');
     execute('/usr/bin/open', ['-n', '-a', selected.path, '--args', '--remote-debugging-port=9222']);
     for (let i = 0; i < 30; i++) {

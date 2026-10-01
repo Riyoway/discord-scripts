@@ -35,4 +35,39 @@ assert.equal(vm.runInNewContext(runner.makeExpression('snowflake',
 assert.equal(runner.makeExpression('token', '"secret"'), '"secret"');
 assert.throws(() => vm.runInNewContext(runner.makeExpression('snowflake',
     'alert("Invalid ID");', 'bad')), /Invalid ID/);
+// Simulate AppKit keeping stale process state until its main run loop advances.
+let quitRequested = false;
+let terminated = false;
+let launches = 0;
+const app = {
+    bundleURL: { isNil: () => false, path: '/Applications/Discord.app' },
+    get terminate() { quitRequested = true; return true; },
+    get terminated() { return terminated; }
+};
+runner.ObjC = { unwrap: value => value };
+runner.$ = {
+    NSWorkspace: { sharedWorkspace: { runningApplications: { count: 1, objectAtIndex: () => app } } },
+    NSHomeDirectory: () => '/Users/example',
+    NSBundle: { bundleWithPath: bundle => ({
+        isNil: () => bundle !== '/Applications/Discord.app', executablePath: { isNil: () => false }
+    }) },
+    NSFileManager: { defaultManager: { isExecutableFileAtPath: () => true } },
+    NSDate: { dateWithTimeIntervalSinceNow: seconds => seconds },
+    NSRunLoop: { currentRunLoop: { runUntilDate() {
+        assert.ok(quitRequested, 'Request a normal quit before waiting');
+        terminated = true;
+    } } }
+};
+runner.write = () => {};
+runner.delay = () => {};
+runner.fetchText = () => 'ready';
+runner.execute = (executable, args) => {
+    assert.ok(terminated, 'Wait for confirmed termination before relaunching');
+    assert.equal(executable, '/usr/bin/open');
+    assert.equal(args[2], '/Applications/Discord.app');
+    assert.equal(args[4], '--remote-debugging-port=9222');
+    launches++;
+};
+runner.startDiscord();
+assert.equal(launches, 1);
 console.log('Native macOS runner logic check passed.');
