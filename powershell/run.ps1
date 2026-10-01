@@ -83,7 +83,7 @@ if (-not $page) { throw "No Discord window found on the debug port. Open the mai
 $ws = [Net.WebSockets.ClientWebSocket]::new()
 try {
     $connectCancellation = [Threading.CancellationTokenSource]::new(5000)
-    try { $ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $connectCancellation.Token).GetAwaiter().GetResult() }
+    try { [void]$ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $connectCancellation.Token).GetAwaiter().GetResult() }
     finally { $connectCancellation.Dispose() }
     function Invoke-Cdp($id, $e, $timeoutMs = 8000) {
         $cts = [Threading.CancellationTokenSource]::new($timeoutMs)
