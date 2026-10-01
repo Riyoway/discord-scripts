@@ -1,6 +1,6 @@
 # discord-scripts
 
-Scripts for Discord, served from the [script library](https://script.riyo.me/library?=discord). Browse, read, and copy the source there. All scripts have a [`console/`](console) version to paste into DevTools and a [`powershell/`](powershell) runner for the desktop client.
+Scripts for Discord, served from the [script library](https://script.riyo.me/library?=discord). Browse, read, and copy the source there. All scripts have a [`console/`](console) version to paste into DevTools, a [`powershell/`](powershell) runner for Windows, and a shared native [`macos/`](macos) runner.
 
 | Script | What it does |
 | --- | --- |
@@ -35,7 +35,7 @@ Every script runs in Discord's DevTools console, in the desktop app or on discor
 
 A one-line loader such as `fetch("https://script.riyo.me/d/c/autoquest")` does not work in Discord's console. Discord's Content Security Policy blocks requests to hosts outside its allowlist, so the full script has to be pasted.
 
-### From PowerShell (Windows or macOS desktop app)
+### Windows PowerShell
 
 Every script has a one-line runner using the shared `powershell/run.ps1` injector. It runs the script in the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so Discord's CSP does not block loading the source. Network requests made by the injected script still follow the client's CSP.
 
@@ -53,21 +53,22 @@ irm https://script.riyo.me/d/p/search | iex         # open the channel message f
 
 Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/d/p/autoquest | iex"`.
 
-#### macOS Terminal
+### macOS Terminal
 
-Install [PowerShell 7 for macOS](https://learn.microsoft.com/en-us/powershell/scripting/install/install-powershell-on-macos) using Microsoft's package for your Mac, or use Homebrew:
+No additional installation is required on macOS 10.15 or later. The runner uses the built-in shell, `curl`, and JavaScript for Automation (`osascript`):
 
 ```sh
-brew install powershell
-pwsh -NoProfile -Command 'irm https://script.riyo.me/p/menu | iex'
-pwsh -NoProfile -Command 'irm https://script.riyo.me/d/p/autoquest | iex'
+curl -fsSL https://script.riyo.me/m/menu | sh
+curl -fsSL https://script.riyo.me/d/m/run | sh -s -- autoquest
 ```
 
-Replace `autoquest` with any script name from the table. All eight runners and the menu use the same PowerShell 7 implementation on macOS. The library includes **macOS command** copy buttons. Clipboard operations use PowerShell's native macOS `pbcopy` integration.
+Replace `autoquest` with any script name from the table. All eight scripts use the shared native injector. The menu supports running a script, copying its source, or copying its terminal command. The library includes **macOS command** copy buttons. Tokens go directly to the clipboard without being printed; `whoami` returns JSON in Terminal, and `snowflake` reads an ID from Terminal and copies its timestamp.
 
 The macOS runner finds Stable, PTB, Canary or Development in `/Applications` or `~/Applications`, reads the bundle's executable name, and selects a running installation when possible. If a debug endpoint already exists, it reuses it. Otherwise it quits only the selected app, waits for it to exit, and launches it with a local debugging port. If the app does not quit or launch, the runner stops with an error. Log in to Discord before running a script.
 
-macOS launch and clipboard behavior have not been verified on a physical Mac. The offline check covers the macOS launch branch using mocked native commands, without starting Discord or accessing an account.
+The injector uses Apple's [URLSession WebSocket API](https://developer.apple.com/documentation/foundation/urlsessionwebsockettask). Its callbacks run on the [session's main delegate queue](https://developer.apple.com/documentation/foundation/urlsession/delegatequeue). No browser window, UI automation, or Accessibility permission is needed. Source fetching happens outside Discord's CSP.
+
+macOS launch, networking, and clipboard behavior have not been verified on a physical Mac. An offline logic check is available with `node tests/macos.test.cjs`; it does not launch Discord or access an account. It cannot validate Apple's runtime bridge.
 
 Offline runner check: `powershell -File tests/powershell.test.ps1`. This checks registration, syntax, and terminal input/output without launching Discord.
 
@@ -136,4 +137,4 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 
 For client compatibility work, consult [Discord Client Internals](https://github.com/Riyoway/discord-client-internals) (private repository). Its offline `index.html` documents store/HTTP lookup fingerprints with captured build numbers and hashes. Run its collector on the affected build before changing module selectors; a lookup snapshot alone is not an end-to-end script test.
 
-Vercel rewrites proxy this repo's `main` branch: `script.riyo.me/d/c/<name>` serves `console/<name>.js` (copy-paste), `script.riyo.me/d/p/<name>` serves `powershell/<name>.ps1` (run with `| iex`), and `/p/menu` serves the shared picker. To publish a script, push its source file, then add an entry to `scripts.json` with `category`, `name`, `desc`, and `source`; add `runner` when a PowerShell runner exists. The library page and menu read that manifest. GitHub's cache can take up to 5 minutes to update.
+Vercel rewrites proxy this repo's `main` branch: `/d/c/<name>` serves `console/<name>.js`, `/d/p/<name>` serves `powershell/<name>.ps1`, and `/p/menu` serves the PowerShell picker. `/d/m/run` and `/m/menu` serve `macos/run.sh`, which downloads `macos/run.js` from `/d/m/client`. To publish a script, push its source file, then add an entry to `scripts.json` with `category`, `name`, `desc`, and `source`; add `runner` when a desktop runner exists. Discord entries automatically appear in the macOS picker. The library page and menus read that manifest. GitHub's cache can take up to 5 minutes to update.

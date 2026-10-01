@@ -63,7 +63,9 @@ function Select-Item($items, $title, $category = $false) {
             "P" {
                 $s = $items[$sel]
                 $cmd = if ($s.runner) { "irm $(Resolve-ScriptUrl $s.runner) | iex" } else { "irm $(Resolve-ScriptUrl $s.source) | scb" }
-                if ($PSVersionTable.PSEdition -eq 'Core' -and $IsMacOS) { $cmd = "pwsh -NoProfile -Command '" + $cmd.Replace("'", "'`"'`"'") + "'" }
+                if ($PSVersionTable.PSEdition -eq 'Core' -and $IsMacOS) {
+                    $cmd = if ($s.runner -and $s.category -eq 'Discord') { "curl -fsSL $BASE/d/m/run | sh -s -- $($s.name)" } else { "curl -fsSL $(Resolve-ScriptUrl $s.source) | pbcopy" }
+                }
                 Set-Clipboard -Value $cmd; $status = "Copied command: $cmd"
             }
             "Enter" {
