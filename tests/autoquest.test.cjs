@@ -105,7 +105,7 @@ function harness(quests, options = {}) {
         Object.setPrototypeOf(value, Object.fromEntries(Object.entries(value).filter(([, method]) => typeof method === "function")));
     }
     // Mirrors Discord's lazy exports, including proxies polluted by earlier property probes.
-    const lazyExport = new Proxy({ get() {}, post() {}, del() {}, getQuest() {}, quests() {} }, { get: (object, key) => object[key] ?? (() => undefined) });
+    const lazyExport = new Proxy({ get() {}, post() {}, del() {}, put() {}, patch() {}, getQuest() {}, quests() {} }, { get: (object, key) => object[key] ?? (() => undefined) });
     const modules = {
         firstLazyExport: { exports: { default: lazyExport } },
         store: { exports: { renamedStoreExport: store } }, http: { exports: { renamedApiExport: api } },
