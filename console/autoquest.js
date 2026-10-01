@@ -21,13 +21,18 @@ const findModule = (test) => {
     }
     return null;
 };
-const QuestsStore = findModule(x => typeof x.getQuest === "function");
-const api = findModule(x => typeof x.get === "function" && typeof x.post === "function" && (typeof x.del === "function" || typeof x.delete === "function"));
-const RunningGameStore = findModule(x => typeof x.getRunningGames === "function" && typeof x.getGameForPID === "function");
-const ApplicationStreamingStore = findModule(x => typeof x.getStreamerActiveStreamMetadata === "function");
-const ChannelStore = findModule(x => typeof x.getSortedPrivateChannels === "function");
-const GuildChannelStore = findModule(x => typeof x.getAllGuilds === "function");
-const FluxDispatcher = findModule(x => typeof x.dispatch === "function" && typeof x.subscribe === "function" && typeof x.unsubscribe === "function");
+// Lazy export proxies fabricate functions for unknown properties, even during descriptor probes.
+// Real stores have prototype methods; the authenticated HTTP client binds its request methods.
+const findStore = method => findModule(x => typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(x), method)?.value === "function");
+const QuestsStore = findStore("getQuest");
+const api = findModule(x => ["get", "post", "put", "patch"].every(method => typeof Object.getOwnPropertyDescriptor(x, method)?.value === "function")
+    && ["del", "delete"].some(method => typeof Object.getOwnPropertyDescriptor(x, method)?.value === "function")
+    && /^bound /.test(x.get.name) && /^bound /.test(x.post.name));
+const RunningGameStore = findStore("getRunningGames");
+const ApplicationStreamingStore = findStore("getStreamerActiveStreamMetadata");
+const ChannelStore = findStore("getSortedPrivateChannels");
+const GuildChannelStore = findStore("getAllGuilds");
+const FluxDispatcher = findStore("dispatch");
 if (!QuestsStore || !api) throw new Error("Discord's quest store or HTTP client was not found. Reload Discord and try again.");
 const supportedTasks = ["WATCH_VIDEO", "PLAY_ON_DESKTOP", "PLAY_ON_XBOX", "PLAY_ON_PLAYSTATION", "STREAM_ON_DESKTOP", "PLAY_ACTIVITY", "WATCH_VIDEO_ON_MOBILE", "ACHIEVEMENT_IN_ACTIVITY"];
 const isApp = typeof DiscordNative !== "undefined";

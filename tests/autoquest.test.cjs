@@ -96,12 +96,22 @@ function harness(quests, options = {}) {
         }
         throw new Error("Unexpected request: " + method + " " + url);
     };
-    const api = { get: opts => request("get", opts), post: opts => request("post", opts), del: opts => request("del", opts) };
+    const api = { get: opts => request("get", opts), post: opts => request("post", opts), del: opts => request("del", opts), put() {}, patch() {} };
+    api.get = api.get.bind(api);
+    api.post = api.post.bind(api);
+    const channels = { getSortedPrivateChannels: () => options.noChannels ? [] : [{ id: "123" }] };
+    const guilds = { getAllGuilds: () => ({}) };
+    for (const value of [store, games, streaming, dispatcher, channels, guilds]) {
+        Object.setPrototypeOf(value, Object.fromEntries(Object.entries(value).filter(([, method]) => typeof method === "function")));
+    }
+    // Mirrors Discord's lazy exports, including proxies polluted by earlier property probes.
+    const lazyExport = new Proxy({ get() {}, post() {}, del() {}, getQuest() {}, quests() {} }, { get: (object, key) => object[key] ?? (() => undefined) });
     const modules = {
+        firstLazyExport: { exports: { default: lazyExport } },
         store: { exports: { renamedStoreExport: store } }, http: { exports: { renamedApiExport: api } },
         games: { exports: { random: games } }, streaming: { exports: streaming }, flux: { exports: { changed: dispatcher } },
-        channels: { exports: { getSortedPrivateChannels: () => options.noChannels ? [] : [{ id: "123" }] } },
-        guilds: { exports: { getAllGuilds: () => ({}) } }
+        channels: { exports: channels },
+        guilds: { exports: guilds }
     };
     const context = vm.createContext({
         window, document, URL, URLSearchParams, AbortController, EventTarget, Event, Date: ClockDate,
