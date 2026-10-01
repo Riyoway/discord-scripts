@@ -1,4 +1,4 @@
-# menu — a TUI to browse, copy, and run scripts from PowerShell.
+# menu — browse, copy, and run scripts from PowerShell on Windows or macOS.
 #   irm https://script.riyo.me/p/menu | iex
 $ErrorActionPreference = "Stop"
 $BASE = "https://script.riyo.me"
@@ -63,6 +63,7 @@ function Select-Item($items, $title, $category = $false) {
             "P" {
                 $s = $items[$sel]
                 $cmd = if ($s.runner) { "irm $(Resolve-ScriptUrl $s.runner) | iex" } else { "irm $(Resolve-ScriptUrl $s.source) | scb" }
+                if ($PSVersionTable.PSEdition -eq 'Core' -and $IsMacOS) { $cmd = "pwsh -NoProfile -Command '" + $cmd.Replace("'", "'`"'`"'") + "'" }
                 Set-Clipboard -Value $cmd; $status = "Copied command: $cmd"
             }
             "Enter" {

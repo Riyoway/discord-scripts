@@ -1,6 +1,8 @@
 # Shared Discord desktop injector. Called by the named runners.
 param([Parameter(Mandatory = $true)][ValidateSet('autoquest', 'token', 'timestamp', 'media', 'whoami', 'export', 'snowflake', 'search')][string]$Name)
 $ErrorActionPreference = "Stop"
+$macOS = $PSVersionTable.PSEdition -eq 'Core' -and $IsMacOS
+if (-not $macOS -and $env:OS -ne 'Windows_NT') { throw 'This runner supports Windows and macOS (PowerShell 7).' }
 $port = 9222
 Write-Host "Fetching $Name..." -ForegroundColor Cyan
 $code = Invoke-RestMethod "https://script.riyo.me/d/c/$Name" -TimeoutSec 30
@@ -20,6 +22,39 @@ if ($Name -eq 'snowflake') {
 # Ensure the desktop client is running with the debug port open.
 function Test-Port { try { Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec 2 | Out-Null; $true } catch { $false } }
 if (-not (Test-Port)) {
+    if ($macOS) {
+        # pgrep exit 1 means that the selected application is not running.
+        $PSNativeCommandUseErrorActionPreference = $false
+        function Get-MacDiscordPids($executable) {
+            $ids = @(& /usr/bin/pgrep -f "^$([regex]::Escape($executable))([[:space:]]|$)")
+            if ($LASTEXITCODE -gt 1) { throw 'Could not inspect running Discord applications.' }
+            @($ids | Where-Object { $_ -match '^\d+$' } | ForEach-Object { [int]$_ })
+        }
+        $installed = @(foreach ($directory in '/Applications', (Join-Path $HOME 'Applications')) {
+            foreach ($name in 'Discord', 'Discord PTB', 'Discord Canary', 'Discord Development') {
+                $bundle = Join-Path $directory "$name.app"
+                $plist = Join-Path $bundle 'Contents/Info.plist'
+                if (-not (Test-Path -LiteralPath $plist)) { continue }
+                $binary = & /usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' $plist
+                if ($LASTEXITCODE -ne 0 -or -not $binary -or $binary -match '[/\\]') { throw "Invalid Discord application bundle: $bundle" }
+                $executable = Join-Path $bundle "Contents/MacOS/$binary"
+                if (-not (Test-Path -LiteralPath $executable)) { continue }
+                [pscustomobject]@{ Name = $name; Bundle = $bundle; Executable = $executable; Pids = @(Get-MacDiscordPids $executable) }
+            }
+        })
+        if (-not $installed.Count) { throw 'No Discord app found in /Applications or ~/Applications.' }
+        $app = $installed | Where-Object { $_.Pids.Count } | Select-Object -First 1
+        if (-not $app) { $app = $installed[0] }
+        Write-Host "Starting $($app.Name) with remote debugging enabled (restarting it will drop any call)..." -ForegroundColor Cyan
+        if ($app.Pids.Count) {
+            & /bin/kill -TERM @($app.Pids)
+            if ($LASTEXITCODE -ne 0) { throw 'Could not quit Discord. Quit it manually and try again.' }
+            for ($i = 0; $i -lt 20 -and @(Get-MacDiscordPids $app.Executable).Count; $i++) { Start-Sleep -Milliseconds 500 }
+            if (@(Get-MacDiscordPids $app.Executable).Count) { throw 'Discord did not quit. Quit it manually and try again.' }
+        }
+        & /usr/bin/open -n -a $app.Bundle --args "--remote-debugging-port=$port"
+        if ($LASTEXITCODE -ne 0) { throw 'Could not launch Discord.' }
+    } else {
     # Works with any flavor: folder name == process name == "<name>.exe".
     $installed = "Discord", "DiscordPTB", "DiscordCanary", "DiscordDevelopment" | Where-Object { Test-Path "$env:LOCALAPPDATA\$_\Update.exe" }
     if (-not $installed) { throw "No Discord desktop app found (looked for Discord, PTB, Canary, Development)." }
@@ -29,6 +64,7 @@ if (-not (Test-Port)) {
     Get-Process $flavor -EA SilentlyContinue | Stop-Process -Force
     Start-Sleep 2
     & "$env:LOCALAPPDATA\$flavor\Update.exe" --processStart "$flavor.exe" --process-start-args "--remote-debugging-port=$port"
+    }
     $ok = $false; for ($i = 0; $i -lt 30; $i++) { Start-Sleep 1; if (Test-Port) { $ok = $true; break } }
     if (-not $ok) { throw "Debug port never opened; this Discord build may block --remote-debugging-port." }
 }
@@ -38,7 +74,7 @@ Write-Host "Locating the Discord window..." -ForegroundColor Cyan
 $page = $null
 for ($i = 0; $i -lt 20 -and -not $page; $i++) {
     Start-Sleep 1
-    try { $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 3 | Where-Object { $_.type -eq 'page' -and $_.url -match '^https://(?:[a-z0-9-]+\.)?discord\.com/' } } catch { continue }
+    try { $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 3 | ForEach-Object { $_ } | Where-Object { $_.type -eq 'page' -and $_.url -match '^https://(?:[a-z0-9-]+\.)?discord\.com/(?:channels|quest-home|app)(?:/|$)' } } catch { continue }
     $page = ($pages | Where-Object { $_.url -match '/channels|/app' } | Select-Object -First 1)
     if (-not $page) { $page = $pages | Select-Object -First 1 }
 }

@@ -35,7 +35,7 @@ Every script runs in Discord's DevTools console, in the desktop app or on discor
 
 A one-line loader such as `fetch("https://script.riyo.me/d/c/autoquest")` does not work in Discord's console. Discord's Content Security Policy blocks requests to hosts outside its allowlist, so the full script has to be pasted.
 
-### From PowerShell (desktop app)
+### From PowerShell (Windows or macOS desktop app)
 
 Every script has a one-line runner using the shared `powershell/run.ps1` injector. It runs the script in the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so Discord's CSP does not block loading the source. Network requests made by the injected script still follow the client's CSP.
 
@@ -53,9 +53,25 @@ irm https://script.riyo.me/d/p/search | iex         # open the channel message f
 
 Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/d/p/autoquest | iex"`.
 
+#### macOS Terminal
+
+Install [PowerShell 7 for macOS](https://learn.microsoft.com/en-us/powershell/scripting/install/install-powershell-on-macos) using Microsoft's package for your Mac, or use Homebrew:
+
+```sh
+brew install powershell
+pwsh -NoProfile -Command 'irm https://script.riyo.me/p/menu | iex'
+pwsh -NoProfile -Command 'irm https://script.riyo.me/d/p/autoquest | iex'
+```
+
+Replace `autoquest` with any script name from the table. All eight runners and the menu use the same PowerShell 7 implementation on macOS. The library includes **macOS command** copy buttons. Clipboard operations use PowerShell's native macOS `pbcopy` integration.
+
+The macOS runner finds Stable, PTB, Canary or Development in `/Applications` or `~/Applications`, reads the bundle's executable name, and selects a running installation when possible. If a debug endpoint already exists, it reuses it. Otherwise it quits only the selected app, waits for it to exit, and launches it with a local debugging port. If the app does not quit or launch, the runner stops with an error. Log in to Discord before running a script.
+
+macOS launch and clipboard behavior have not been verified on a physical Mac. The offline check covers the macOS launch branch using mocked native commands, without starting Discord or accessing an account.
+
 Offline runner check: `powershell -File tests/powershell.test.ps1`. This checks registration, syntax, and terminal input/output without launching Discord.
 
-The runner quits Discord (interrupting any call), relaunches it with `--remote-debugging-port=9222`, and runs the script in the main window. The debug port stays open until Discord is restarted normally; while it is open, any local program can run code in your Discord, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`; verify with `irm http://127.0.0.1:9222/json/version` after launch.
+The runner reuses an existing debugging endpoint when available; otherwise it quits Discord (interrupting any call), relaunches it with `--remote-debugging-port=9222`, and runs the script in the main window. The debug port stays open until Discord is restarted normally; while it is open, any local program can run code in your Discord, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`; verify with `irm http://127.0.0.1:9222/json/version` after launch.
 
 DevTools is disabled in the desktop app by default. To enable it, add this line to `%APPDATA%\discord\settings.json` (macOS: `~/Library/Application Support/discord/settings.json`), then restart Discord:
 
