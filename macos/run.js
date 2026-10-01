@@ -4,7 +4,7 @@ const DEBUG = 'http://127.0.0.1:9222';
 
 function commandFor(name) {
     if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new Error('Invalid script name.');
-    return 'curl -fsSL ' + BASE + '/d/m/run | sh -s -- ' + name;
+    return 'curl -fsSL ' + BASE + '/d/m/' + name + ' | sh';
 }
 
 function selectPage(pages) {

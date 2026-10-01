@@ -12,7 +12,9 @@ for (const script of manifest) {
     const code = fs.readFileSync(path.join(root, 'console', script.name + '.js'), 'utf8');
     new vm.Script(runner.makeExpression(script.name, code, '175928847299117063'));
     assert.equal(runner.commandFor(script.name),
-        'curl -fsSL https://script.riyo.me/d/m/run | sh -s -- ' + script.name);
+        'curl -fsSL https://script.riyo.me/d/m/' + script.name + ' | sh');
+    const wrapper = fs.readFileSync(path.join(root, 'macos', script.name + '.sh'), 'utf8');
+    assert.ok(wrapper.includes('/d/m/run') && wrapper.includes('riyo-scripts ' + script.name));
 }
 assert.throws(() => runner.commandFor('token; echo unsafe'), /Invalid script name/);
 const login = { type: 'page', url: 'https://discord.com/login' };

@@ -59,7 +59,7 @@ No additional installation is required on macOS 10.15 or later. The runner uses 
 
 ```sh
 curl -fsSL https://script.riyo.me/m/menu | sh
-curl -fsSL https://script.riyo.me/d/m/run | sh -s -- autoquest
+curl -fsSL https://script.riyo.me/d/m/autoquest | sh
 ```
 
 Replace `autoquest` with any script name from the table. All eight scripts use the shared native injector. The menu supports running a script, copying its source, or copying its terminal command. The library includes **macOS command** copy buttons. Tokens go directly to the clipboard without being printed; `whoami` returns JSON in Terminal, and `snowflake` reads an ID from Terminal and copies its timestamp.
@@ -137,4 +137,4 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 
 For client compatibility work, consult [Discord Client Internals](https://github.com/Riyoway/discord-client-internals) (private repository). Its offline `index.html` documents store/HTTP lookup fingerprints with captured build numbers and hashes. Run its collector on the affected build before changing module selectors; a lookup snapshot alone is not an end-to-end script test.
 
-Vercel rewrites proxy this repo's `main` branch: `/d/c/<name>` serves `console/<name>.js`, `/d/p/<name>` serves `powershell/<name>.ps1`, and `/p/menu` serves the PowerShell picker. `/d/m/run` and `/m/menu` serve `macos/run.sh`, which downloads `macos/run.js` from `/d/m/client`. To publish a script, push its source file, then add an entry to `scripts.json` with `category`, `name`, `desc`, and `source`; add `runner` when a desktop runner exists. Discord entries automatically appear in the macOS picker. The library page and menus read that manifest. GitHub's cache can take up to 5 minutes to update.
+Vercel rewrites proxy this repo's `main` branch: `/d/c/<name>` serves `console/<name>.js`, `/d/p/<name>` serves `powershell/<name>.ps1`, and `/p/menu` serves the PowerShell picker. `/d/m/<name>` serves `macos/<name>.sh`; these wrappers call the shared loader at `/d/m/run`. `/m/menu` also serves that loader, which downloads `macos/run.js` from `/d/m/client`. To publish a script, push its source file and named runners, then add an entry to `scripts.json` with `category`, `name`, `desc`, and `source`; add `runner` when a desktop runner exists. Discord entries automatically appear in the macOS picker. The library page and menus read that manifest. GitHub's cache can take up to 5 minutes to update.
