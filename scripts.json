@@ -5,5 +5,6 @@
   { "category": "Discord", "name": "media", "desc": "Fetch images and videos with progress and Stop, then save one ZIP.", "source": "/d/c/media", "runner": "/d/p/media" },
   { "category": "Discord", "name": "whoami", "desc": "Print your account and a server/DM/friend inventory (read-only).", "source": "/d/c/whoami", "runner": "/d/p/whoami" },
   { "category": "Discord", "name": "export", "desc": "Save the open DM/channel as a Discord-looking HTML file.", "source": "/d/c/export", "runner": "/d/p/export" },
-  { "category": "Discord", "name": "snowflake", "desc": "Decode a Discord ID or message link into its creation time.", "source": "/d/c/snowflake", "runner": "/d/p/snowflake" }
+  { "category": "Discord", "name": "snowflake", "desc": "Decode a Discord ID or message link into its creation time.", "source": "/d/c/snowflake", "runner": "/d/p/snowflake" },
+  { "category": "Discord", "name": "search", "desc": "Search channel messages with keywords or RegExp, then export TXT or JSON.", "source": "/d/c/search", "runner": "/d/p/search" }
 ]

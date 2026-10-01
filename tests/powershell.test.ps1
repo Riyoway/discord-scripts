@@ -50,6 +50,6 @@ assert.equal(tables[0].username,'Offline user');assert.equal(tables[0].servers,1
             Assert ($LASTEXITCODE -eq 0) 'Snowflake runner did not return its timestamp'
         }
     }
-    Assert ($manifest.Count -eq 7) 'Expected all seven Discord scripts'
+    Assert ($manifest.Count -eq 8) 'Expected all eight Discord scripts'
     Write-Host 'PASS: runner registration, PowerShell/JavaScript syntax, whoami tables, and terminal snowflake input/output.'
 } finally { if (Test-Path -LiteralPath $tempJs) { Remove-Item -LiteralPath $tempJs } }

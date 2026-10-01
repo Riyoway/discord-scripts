@@ -1,5 +1,5 @@
 # Shared Discord desktop injector. Called by the named runners.
-param([Parameter(Mandatory = $true)][ValidateSet('autoquest', 'token', 'timestamp', 'media', 'whoami', 'export', 'snowflake')][string]$Name)
+param([Parameter(Mandatory = $true)][ValidateSet('autoquest', 'token', 'timestamp', 'media', 'whoami', 'export', 'snowflake', 'search')][string]$Name)
 $ErrorActionPreference = "Stop"
 $port = 9222
 Write-Host "Fetching $Name..." -ForegroundColor Cyan

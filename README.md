@@ -11,6 +11,7 @@ Scripts for Discord, served from the [script library](https://script.riyo.me/lib
 | [`whoami`](console/whoami.js) | Prints your account and a server/DM/friend inventory (read-only) |
 | [`export`](console/export.js) | Saves the open DM/channel as a self-contained, Discord-looking HTML file |
 | [`snowflake`](console/snowflake.js) | Decodes an ID or message link into its creation time and a Discord timestamp |
+| [`search`](console/search.js) | Searches current-channel messages with keywords or RegExp; exports TXT/JSON |
 
 `snowflake` uses the timestamp bits and epoch documented in [Discord's Snowflake reference](https://docs.discord.com/developers/reference#snowflakes).
 
@@ -47,6 +48,7 @@ irm https://script.riyo.me/d/p/media | iex          # open the media downloader
 irm https://script.riyo.me/d/p/whoami | iex         # print account and server inventory here
 irm https://script.riyo.me/d/p/export | iex         # open the channel export panel
 irm https://script.riyo.me/d/p/snowflake | iex      # enter an ID here and copy its timestamp
+irm https://script.riyo.me/d/p/search | iex         # open the channel message finder
 ```
 
 Keep the `https://` — without it, Windows PowerShell 5.1 fails on the HTTP-to-HTTPS redirect. From Command Prompt, wrap it: `powershell -c "irm https://script.riyo.me/d/p/autoquest | iex"`.
@@ -96,6 +98,12 @@ Choose **Download all**, **Images**, or **Videos** to fetch the media in the bac
 Blocked or unavailable URLs are skipped and counted in the result. The ZIP is held in memory until saved; batches are limited to 512 MiB. Choose a smaller batch if you reach the limit.
 
 Archive entries retain filenames from response headers or URLs, with a numeric prefix to avoid collisions. Missing or mismatched media extensions are corrected using the response type or common file signatures. Unidentified files without an extension use `.bin`.
+
+## search
+
+Open a channel or DM, then press **Find** in the search panel. Literal keyword matching ignores case; **RegExp** uses a case-sensitive regular expression. **All messages** scans history in pages of 100. Disable it to fetch the latest 1–100 messages, or set **Limit** to 0 to search the client's cache. The selected channel is fixed for each run.
+
+**Cancel**, closing the panel, and rerunning the script stop further requests and remove drag listeners. Rate limits respect the retry delay, with at most three retries. The panel displays up to 200 matches; exports include all matches scanned before completion or cancellation. **TXT** exports unique URLs, falling back to message text when none exist. **JSON** exports message IDs, timestamps, authors, and content. Searches only read channels accessible to your account.
 
 ## token
 
