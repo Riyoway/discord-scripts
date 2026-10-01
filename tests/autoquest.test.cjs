@@ -60,7 +60,8 @@ function harness(quests, options = {}) {
     const originalStream = () => options.noStream ? null : { id: "999", pid: 42, sourceName: "window" };
     const games = { getRunningGames: originalGames, getGameForPID: originalPid };
     const streaming = { getStreamerActiveStreamMetadata: originalStream };
-    const store = { quests: new Map(quests.map(q => [q.id, q])), getQuest: id => store.quests.get(id) };
+    const questMap = new Map(quests.map(q => [q.id, q]));
+    const store = { quests: options.storeShape === "object" ? Object.fromEntries(questMap) : options.storeShape === "array" ? quests : options.storeShape === "missing" ? undefined : questMap, getQuest: id => questMap.get(id) };
     const dispatcher = {
         dispatch: data => changes.push(data),
         subscribe(type, fn) { if (!subscriptions.has(type)) subscriptions.set(type, new Set()); subscriptions.get(type).add(fn); },
@@ -161,6 +162,27 @@ function harness(quests, options = {}) {
 }
 
 (async () => {
+    for (const storeShape of ["object", "array", "missing"]) {
+        const client = harness([makeQuest("WATCH_VIDEO")], { storeShape });
+        await client.finish();
+        assert.equal(client.run.state.quests[0].result, "Completed");
+        await client.stop();
+    }
+    for (const storeShape of ["object", "array"]) {
+        const client = harness([makeQuest("WATCH_VIDEO")], { storeShape, request: (method, opts) => {
+            if (opts.url === "/quests/@me") throw new Error("Quest list unavailable");
+        } });
+        await client.finish();
+        assert.equal(client.run.state.quests[0].result, "Completed");
+        await client.stop();
+    }
+    const startupError = harness([], { storeShape: "missing", request: () => { throw new Error("<blocked> HTTP 403"); } });
+    await startupError.finish();
+    assert.equal(startupError.run.state.overall, "ERROR");
+    assert.match(startupError.panel().innerHTML, /&lt;blocked&gt; HTTP 403/);
+    assert(!startupError.panel().innerHTML.includes("No active quests"));
+    assert.equal(startupError.panel().querySelector("#autoquest-btn-pause").disabled, true);
+    await startupError.stop();
     const mobile = makeQuest("WATCH_VIDEO_ON_MOBILE", "1", { unenrolled: true });
     mobile.traffic_metadata_raw = "metadata";
     const desktopVideo = makeQuest("WATCH_VIDEO", "2", { unenrolled: true });

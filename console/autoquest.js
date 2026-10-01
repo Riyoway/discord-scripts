@@ -21,7 +21,7 @@ const findModule = (test) => {
     }
     return null;
 };
-const QuestsStore = findModule(x => typeof x.getQuest === "function" && x.quests);
+const QuestsStore = findModule(x => typeof x.getQuest === "function");
 const api = findModule(x => typeof x.get === "function" && typeof x.post === "function" && (typeof x.del === "function" || typeof x.delete === "function"));
 const RunningGameStore = findModule(x => typeof x.getRunningGames === "function" && typeof x.getGameForPID === "function");
 const ApplicationStreamingStore = findModule(x => typeof x.getStreamerActiveStreamMetadata === "function");
@@ -81,6 +81,13 @@ function activeQuest(quest) {
         && (!quest.config.expiresAt || (Number.isFinite(expires) && expires > Date.now()))
         && (!quest.config.startsAt || (Number.isFinite(starts) && starts <= Date.now()));
 }
+function loadedQuests() {
+    const quests = QuestsStore.quests ?? QuestsStore.getQuests?.();
+    if (!quests) return [];
+    if (Array.isArray(quests)) return quests;
+    if (typeof quests.values === "function") return [...quests.values()];
+    return Object.values(quests);
+}
 function assertActive(quest) {
     signal.throwIfAborted();
     if (quest.config.expiresAt && Date.parse(quest.config.expiresAt) <= Date.now()) throw new Error("Quest expired.");
@@ -135,7 +142,7 @@ async function request(method, options, cleanupRequest = false) {
                 await sleep(seconds * 1000);
                 continue;
             }
-            throw error instanceof Error ? error : new Error("HTTP " + (error?.status ?? "request failed") + (body.message ? ": " + body.message : ""));
+            throw error instanceof Error ? error : new Error(error?.message || ("HTTP " + (error?.status ?? "request failed") + (body.message ? ": " + body.message : "")));
         }
     }
 }
@@ -245,12 +252,14 @@ const OverlayUI = {
         const { quests, currentIdx, progress, percent, isRunning, isPaused, isSticky, overall } = OverlayUI.state;
         let html = `<div style="font-size: 14px; font-weight: bold; color: #fff; margin-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
             <span>AutoQuest Monitor ${isSticky ? '📌' : ''}</span>
-            <span style="font-size: 10px; color: ${isPaused ? '#FAA61A' : '#43B581'}">${isPaused ? 'PAUSED' : overall}</span>
+            <span style="font-size: 10px; color: ${overall === 'ERROR' ? '#ED4245' : isPaused ? '#FAA61A' : '#43B581'}">${isPaused ? 'PAUSED' : overall}</span>
         </div>`;
         
         html += `<div class="autoquest-queue" style="max-height: 320px; overflow-y: auto; padding-right: 4px;">`;
         
-        if (quests.length === 0) {
+        if (overall === "ERROR") {
+            html += `<div role="alert" style="font-size: 12px; color: #ED4245; overflow-wrap: anywhere;">${escapeHtml(progress || "Unknown error")}</div>`;
+        } else if (quests.length === 0) {
             html += `<div style="font-size: 12px; color: #b5bac1;">No active quests.</div>`;
         } else {
             quests.forEach((q, i) => {
@@ -397,7 +406,7 @@ async function refreshQuest(quest) {
 }
 async function start() {
     OverlayUI.init();
-    let rawQuests = [...QuestsStore.quests.values()];
+    let rawQuests;
     let blockedUntil = null;
     try {
         const response = await request("get", { url: "/quests/@me" });
@@ -406,6 +415,8 @@ async function start() {
         blockedUntil = response.body.quest_enrollment_blocked_until ?? response.body.questEnrollmentBlockedUntil;
     } catch (error) {
         signal.throwIfAborted();
+        rawQuests = loadedQuests();
+        if (!rawQuests.length) throw new Error("Could not load quests: " + error.message + ". Open Discover > Quests in Discord and try again.");
         Logger.warn("Could not refresh quests; using Discord's loaded quest list. " + error.message);
     }
     OverlayUI.state.quests = rawQuests.map(normalizeQuest).filter(quest =>
