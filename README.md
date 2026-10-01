@@ -112,13 +112,15 @@ Run the offline regression check with `node tests/autoquest.test.cjs`. It uses a
 
 Choose **Download all**, **Images**, or **Videos** to fetch the media in the background. The panel displays file progress and received bytes. **Stop**, closing the panel, or running the script again aborts the active request and stops the queue. When fetching finishes, click **Save ZIP** to save all successful files in one archive. Nothing is saved automatically and no tabs are opened for failed requests.
 
+Set **Channel** to a channel ID, channel/message link, or `<#channel ID>` mention. Leave it blank to use the current channel. The downloader scans message history for image/video attachments and embeds, without opening the target channel. **Max messages** defaults to 1,000; use 0 for all history. **Stop** also cancels history scanning. Only channels accessible to your account can be read.
+
 Blocked or unavailable URLs are skipped and counted in the result. The ZIP is held in memory until saved; batches are limited to 512 MiB. Choose a smaller batch if you reach the limit.
 
 Archive entries retain filenames from response headers or URLs, with a numeric prefix to avoid collisions. Missing or mismatched media extensions are corrected using the response type or common file signatures. Unidentified files without an extension use `.bin`.
 
 ## search
 
-Open a channel or DM, then press **Find** in the search panel. Literal keyword matching ignores case; **RegExp** uses a case-sensitive regular expression. **All messages** scans history in pages of 100. Disable it to fetch the latest 1–100 messages, or set **Limit** to 0 to search the client's cache. The selected channel is fixed for each run.
+Set **Channel** to a channel ID, channel/message link, or `<#channel ID>` mention, then press **Find**. Leave it blank to use the current channel. The target does not need to be open. Literal keyword matching ignores case; **RegExp** uses a case-sensitive regular expression. **All messages** scans history in pages of 100. Disable it to fetch the latest 1–100 messages, or set **Limit** to 0 to search that channel's local cache (which may be empty if it has never been opened). The target channel is fixed for each run.
 
 **Cancel**, closing the panel, and rerunning the script stop further requests and remove drag listeners. Rate limits respect the retry delay, with at most three retries. The panel displays up to 200 matches; exports include all matches scanned before completion or cancellation. **TXT** exports unique URLs, falling back to message text when none exist. **JSON** exports message IDs, timestamps, authors, and content. Searches only read channels accessible to your account.
 
@@ -136,6 +138,8 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 ## Adding a script
 
 Overlay scripts share the black glass theme and inline SVG icons in `ui/theme.js`. After editing it, run `node scripts/sync-ui.cjs` to embed the updated assets in AutoQuest, Media, Search, Timestamp, Export, and Snowflake. Each published console script remains standalone and loads no UI assets from external hosts. Use `node scripts/sync-ui.cjs --check` to detect stale copies. Snowflake uses the panel in DevTools and retains terminal input/output in desktop runners.
+
+Search and Media also embed `ui/channels.js`, sharing channel input parsing, module lookup, cancellable request waits, and bounded rate-limit retries. Sync after editing this file too.
 
 For client compatibility work, consult [Discord Client Internals](https://github.com/Riyoway/discord-client-internals) (private repository). Its offline `index.html` documents store/HTTP lookup fingerprints with captured build numbers and hashes. Run its collector on the affected build before changing module selectors; a lookup snapshot alone is not an end-to-end script test.
 

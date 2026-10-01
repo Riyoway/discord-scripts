@@ -34,8 +34,8 @@ const waitFor = async (check) => {
     throw new Error("Timed out waiting for the downloader.");
 };
 
-function harness(base, imagePaths, videoPaths = []) {
-    const downloads = [], blobs = new Map();
+function harness(base, imagePaths, videoPaths = [], history) {
+    const downloads = [], blobs = new Map(), historyCalls = [];
     class Element {
         constructor(tag) { this.tag = tag; this.children = []; this.nodes = new Map(); this.events = new Map(); }
         appendChild(node) { node.parent = this; this.children.push(node); }
@@ -45,6 +45,7 @@ function harness(base, imagePaths, videoPaths = []) {
             return this.nodes.get(id);
         }
         addEventListener(type, callback) { this.events.set(type, callback); }
+        removeAttribute(name) { delete this[name]; }
         dispatchEvent(event) { this.events.get(event.type)?.(); }
         click() { if (this.tag === "a") downloads.push(blobs.get(this.href)); }
     }
@@ -67,9 +68,21 @@ function harness(base, imagePaths, videoPaths = []) {
         window: { open() { throw new Error("A popup was opened."); } },
         setTimeout: (fn, ms) => setTimeout(fn, ms).unref()
     });
+    const api = { get: async ({ url }) => {
+        assert.match(url, /^\/channels\/\d+\/messages\?/);
+        historyCalls.push(url);
+        if (history) return history(url);
+        return { body: [...imagePaths.map(url => ({ url, type: 'image/png' })), ...videoPaths.map(url => ({ url, type: 'video/mp4' }))]
+            .map((entry, index) => ({ id: String(1000 - index), attachments: [{ url: entry.url ? base + entry.url : null, content_type: entry.type }] })) };
+    }, post() {}, put() {}, patch() {} };
+    api.get = api.get.bind(api); api.post = api.post.bind(api);
+    const channels = Object.create({ getChannelId: () => '123' });
+    context.webpackChunkdiscord_app = { push: () => ({ c: { channels: { exports: { A: channels } }, api: { exports: { A: api } } } }), pop() {} };
     vm.runInContext(source, context);
     const box = document.getElementById("media-dl");
-    return { box, downloads, document, runAgain: () => vm.runInContext(source, context), node: (id) => box.querySelector("#md-" + id) };
+    box.querySelector('#md-channel').value = '';
+    box.querySelector('#md-limit').value = '1000';
+    return { box, downloads, document, historyCalls, runAgain: () => vm.runInContext(source, context), node: (id) => box.querySelector("#md-" + id) };
 }
 
 function checkZip(bytes) {
@@ -104,6 +117,23 @@ function checkZip(bytes) {
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
     const base = "http://127.0.0.1:" + server.address().port;
     try {
+        const target = harness(base, [], [], () => ({ body: [] }));
+        target.node('channel').value = '<#175928847299117063>';
+        await target.node('all').onclick();
+        assert.match(target.historyCalls[0], /^\/channels\/175928847299117063\/messages\?limit=100$/);
+        assert.match(target.node('status').textContent, /No matching media/);
+        target.node('channel').value = 'not-a-channel';
+        await target.node('all').onclick();
+        assert.equal(target.historyCalls.length, 1);
+        target.node('x').onclick();
+        const scanning = harness(base, [], [], () => new Promise(() => {}));
+        const scan = scanning.node('all').onclick();
+        await new Promise(setImmediate);
+        scanning.node('stop').onclick();
+        await scan;
+        assert.equal(scanning.historyCalls.length, 1);
+        assert.match(scanning.node('status').textContent, /Stopped/);
+        scanning.node('x').onclick();
         const complete = harness(base, ["/%E6%97%A5%E6%9C%AC.png", "/%E6%97%A5%E6%9C%AC.png", "/same.png?one", ""], ["/same.png?two", "/blocked"]);
         const running = complete.node("all").onclick();
         complete.node("all").onclick(); // A second click must not start another queue.

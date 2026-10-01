@@ -31,12 +31,21 @@ function harness(handler, cached = []) {
     const execute = () => vm.runInContext(source, context);
     execute();
     const box = document.getElementById("discord-search-overlay"), node = id => box.querySelector("#" + id);
+    node("search-channel").value = "";
     node("search-query").value = "needle";
     node("search-all-opt").checked = true;
     node("search-limit-opt").value = "100";
     return { box, node, calls, downloads, execute, document, listenerCount: () => [...listeners.values()].reduce((sum, set) => sum + set.size, 0), run: () => node("search-submit-btn").onclick(), close: () => node("search-close-btn").onclick() };
 }
 (async () => {
+    const target = harness(url => {
+        assert.match(url, /^\/channels\/175928847299117063\/messages\?/);
+        return { body: [message(1, 'needle')] };
+    });
+    target.node('search-channel').value = 'https://discord.com/channels/222222222222222222/175928847299117063/333333333333333333';
+    await target.run(); assert.equal(target.calls.length, 1);
+    target.node('search-channel').value = 'https://evil.test/channels/1/175928847299117063';
+    await target.run(); assert.equal(target.calls.length, 1); target.close();
     const first = Array.from({ length: 100 }, (_, i) => message(1000 - i, i === 0 ? "NEEDLE <img onerror=evil()> https://example.test/a" : "other"));
     const full = harness((url, count) => ({ ok: true, body: count === 1 ? first : [message(900, "needle https://example.test/a")] }));
     await full.run();

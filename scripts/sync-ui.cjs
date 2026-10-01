@@ -5,8 +5,9 @@ const root = path.join(__dirname, '..');
 const theme = fs.readFileSync(path.join(root, 'ui/theme.js'), 'utf8').trim();
 const start = '    // BEGIN SHARED UI';
 const end = '    // END SHARED UI';
-const block = start + '\n' + theme.split('\n').map(line => '    ' + line).join('\n') + '\n' + end;
 for (const name of ['autoquest', 'media', 'search', 'timestamp', 'export', 'snowflake']) {
+    const assets = theme + (['media', 'search'].includes(name) ? '\n' + fs.readFileSync(path.join(root, 'ui/channels.js'), 'utf8').trim() : '');
+    const block = start + '\n' + assets.split('\n').map(line => '    ' + line).join('\n') + '\n' + end;
     const file = path.join(root, 'console', name + '.js');
     const source = fs.readFileSync(file, 'utf8').replace(/\r\n/g, '\n');
     const first = source.indexOf(start);

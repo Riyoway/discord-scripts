@@ -1,4 +1,4 @@
-// search — find messages in the current channel and export matching messages or URLs.
+// search — find messages in a specified channel and export matching messages or URLs.
 (() => {
     // BEGIN SHARED UI
     // Embedded by scripts/sync-ui.cjs so every console script works without remote UI assets.
@@ -53,28 +53,74 @@
     @media(max-width:480px){.riyo-panel{right:12px;max-width:calc(100vw - 24px);padding:16px}.riyo-ui .autoquest-panel{max-width:calc(100vw - 32px);padding:16px}.riyo-ui button{min-height:40px}}
     @media(prefers-reduced-motion:reduce){.riyo-ui *{transition:none!important;animation:none!important}}
     </style>`;
+    // Shared channel parsing and authenticated history access for Search and Media.
+    const riyoChannelId = (input, current) => {
+        const value = input.trim();
+        if (!value && /^\d{1,20}$/.test(current || '')) return current;
+        const id = value.match(/^(\d{15,20})$/)?.[1] || value.match(/^<#(\d{15,20})>$/)?.[1]
+            || value.match(/^https?:\/\/(?:[a-z0-9-]+\.)?discord(?:app)?\.com\/channels\/(?:@me|\d+)\/(\d{15,20})(?:\/\d{15,20})?\/?(?:[?#].*)?$/i)?.[1];
+        if (!id) throw new Error('Enter a channel ID or Discord channel/message link. Leave blank for the current channel.');
+        return id;
+    };
+    const riyoChannelModules = () => {
+        if (typeof webpackChunkdiscord_app === 'undefined') throw new Error('Run this script inside Discord after it has loaded.');
+        let require;
+        try { require = webpackChunkdiscord_app.push([[Symbol()], {}, value => value]); }
+        finally { webpackChunkdiscord_app.pop(); }
+        const find = predicate => {
+            for (const module of Object.values(require.c)) {
+                try {
+                    for (const value of [module.exports, ...Object.values(module.exports ?? {})]) {
+                        if (value && predicate(value)) return value;
+                    }
+                } catch { /* Lazy exports may not be initialized yet. */ }
+            }
+            return null;
+        };
+        const store = method => find(value => typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(value), method)?.value === 'function');
+        return {
+            channels: store('getChannelId'), messages: store('getMessages'),
+            api: find(value => ['get', 'post', 'put', 'patch'].every(method => typeof Object.getOwnPropertyDescriptor(value, method)?.value === 'function')
+                && /^bound /.test(value.get.name) && /^bound /.test(value.post.name))
+        };
+    };
+    const riyoDelay = (ms, signal) => new Promise((resolve, reject) => {
+        signal.throwIfAborted();
+        const cancel = () => { clearTimeout(timer); reject(signal.reason); };
+        const timer = setTimeout(() => { signal.removeEventListener('abort', cancel); resolve(); }, ms);
+        signal.addEventListener('abort', cancel, { once: true });
+    });
+    const riyoWait = (promise, signal) => new Promise((resolve, reject) => {
+        const finish = (callback, value) => { clearTimeout(timer); signal.removeEventListener('abort', cancel); callback(value); };
+        const cancel = () => finish(reject, signal.reason);
+        const timer = setTimeout(() => finish(reject, new Error('Request timed out after 30 seconds.')), 30000);
+        signal.addEventListener('abort', cancel, { once: true });
+        Promise.resolve(promise).then(value => finish(resolve, value), error => finish(reject, error));
+        if (signal.aborted) cancel();
+    });
+    const riyoFetchMessages = async (api, url, signal, report) => {
+        if (!api) throw new Error("Discord's HTTP client was not found. Reload Discord and try again.");
+        for (let attempt = 0; ; attempt++) {
+            signal.throwIfAborted();
+            try {
+                const response = await riyoWait(api.get({ url, timeout: 30000 }), signal);
+                signal.throwIfAborted();
+                if (response?.ok === false || response?.status >= 400) throw response;
+                if (!Array.isArray(response?.body)) throw new Error('Unexpected message response.');
+                return response.body;
+            } catch (error) {
+                signal.throwIfAborted();
+                if (error?.status !== 429 || attempt >= 3) throw new Error(error?.message || error?.body?.message || 'HTTP ' + (error?.status ?? 'request failed'));
+                const seconds = Number(error.body?.retry_after ?? error.headers?.get?.('Retry-After') ?? 5);
+                report('Rate limited. Waiting to retry...');
+                await riyoDelay((Number.isFinite(seconds) && seconds >= 0 ? seconds : 5) * 1000, signal);
+            }
+        }
+    };
     // END SHARED UI
     const old = document.getElementById("discord-search-overlay");
     if (old) { old.dispatchEvent(new Event("search-close")); old.remove(); }
-    if (typeof webpackChunkdiscord_app === "undefined") throw new Error("Run search inside Discord after it has loaded.");
-    let require;
-    try { require = webpackChunkdiscord_app.push([[Symbol()], {}, value => value]); }
-    finally { webpackChunkdiscord_app.pop(); }
-    const find = predicate => {
-        for (const module of Object.values(require.c)) {
-            try {
-                for (const value of [module.exports, ...Object.values(module.exports ?? {})]) {
-                    if (value && predicate(value)) return value;
-                }
-            } catch { /* Lazy exports may not be initialized yet. */ }
-        }
-        return null;
-    };
-    // Lazy exports fabricate methods; use store prototypes and the HTTP client's bound methods.
-    const store = method => find(value => typeof Object.getOwnPropertyDescriptor(Object.getPrototypeOf(value), method)?.value === "function");
-    const channels = store("getChannelId"), messages = store("getMessages");
-    const api = find(value => ["get", "post", "put", "patch"].every(method => typeof Object.getOwnPropertyDescriptor(value, method)?.value === "function")
-        && /^bound /.test(value.get.name) && /^bound /.test(value.post.name));
+    const { channels, messages, api } = riyoChannelModules();
     const box = document.createElement("section");
     box.id = "discord-search-overlay";
     box.className = "riyo-ui riyo-panel";
@@ -84,6 +130,7 @@
             <strong class="riyo-title">${riyoIcon('search')}Message search</strong>
             <button id="search-close-btn" class="riyo-close" aria-label="Close search">${riyoIcon('close')}</button>
         </header>
+        <label class="riyo-label">Channel<input id="search-channel" placeholder="Channel ID or link (blank = current)"></label>
         <input id="search-query" aria-label="Search keyword or regular expression" placeholder="Search keyword...">
         <div class="riyo-options">
             <label class="riyo-check"><input type="checkbox" id="search-regex-opt">RegExp</label>
@@ -91,12 +138,13 @@
             <label id="limit-container" class="riyo-check" hidden>Limit <input id="search-limit-opt" type="number" min="0" max="100" value="100" style="width:64px" title="0 searches cached messages"></label>
         </div>
         <button id="search-submit-btn" class="riyo-primary">Find</button>
-        <div id="search-stats" class="riyo-status" role="status">Open a channel, enter a keyword, then press Find.</div>
+        <div id="search-stats" class="riyo-status" role="status">Choose a channel, enter a keyword, then press Find.</div>
         <div id="search-export-container" class="riyo-row" hidden><button id="export-txt-btn">${riyoIcon('download')}Save TXT</button><button id="export-json-btn">${riyoIcon('download')}Save JSON</button></div>
         <div id="search-results-list"></div>`;
     document.body.appendChild(box);
     const node = id => box.querySelector("#" + id);
     const query = node("search-query"), regex = node("search-regex-opt"), all = node("search-all-opt");
+    const target = node("search-channel");
     const limit = node("search-limit-opt"), button = node("search-submit-btn"), stats = node("search-stats");
     const results = node("search-results-list"), exports = node("search-export-container");
     let controller = null, matched = [], exportQuery = "", closed = false, drag = null;
@@ -126,39 +174,8 @@
     box.addEventListener("search-close", close);
     node("search-close-btn").onclick = close;
     all.onchange = () => { node("limit-container").hidden = all.checked; };
-    // Cancel local waits immediately; an already-sent internal HTTP request cannot be recalled.
-    const wait = (promise, signal) => new Promise((resolve, reject) => {
-        const finish = (callback, value) => { clearTimeout(timer); signal.removeEventListener("abort", cancel); callback(value); };
-        const cancel = () => finish(reject, signal.reason);
-        const timer = setTimeout(() => finish(reject, new Error("Request timed out after 30 seconds.")), 30000);
-        signal.addEventListener("abort", cancel, { once: true });
-        Promise.resolve(promise).then(value => finish(resolve, value), error => finish(reject, error));
-        if (signal.aborted) cancel();
-    });
-    const delay = (ms, signal) => new Promise((resolve, reject) => {
-        signal.throwIfAborted();
-        const cancel = () => { clearTimeout(timer); reject(signal.reason); };
-        const timer = setTimeout(() => { signal.removeEventListener("abort", cancel); resolve(); }, ms);
-        signal.addEventListener("abort", cancel, { once: true });
-    });
-    const fetchBatch = async (url, signal) => {
-        for (let attempt = 0; ; attempt++) {
-            signal.throwIfAborted();
-            try {
-                const response = await wait(api.get({ url, timeout: 30000 }), signal);
-                signal.throwIfAborted();
-                if (response?.ok === false || response?.status >= 400) throw response;
-                if (!Array.isArray(response?.body)) throw new Error("Unexpected message response.");
-                return response.body;
-            } catch (error) {
-                signal.throwIfAborted();
-                if (error?.status !== 429 || attempt >= 3) throw new Error(error?.message || error?.body?.message || "HTTP " + (error?.status ?? "request failed"));
-                const seconds = Number(error.body?.retry_after ?? error.headers?.get?.("Retry-After") ?? 5);
-                stats.textContent = "Rate limited. Waiting to retry...";
-                await delay((Number.isFinite(seconds) && seconds >= 0 ? seconds : 5) * 1000, signal);
-            }
-        }
-    };
+    const delay = riyoDelay;
+    const fetchBatch = (url, signal) => riyoFetchMessages(api, url, signal, text => { stats.textContent = text; });
     const render = pattern => {
         results.replaceChildren();
         // Keep the overlay responsive; exports include every match, including undisplayed results.
@@ -191,8 +208,7 @@
         try {
             if (!query.value.trim()) throw new Error("Enter a keyword or regular expression.");
             pattern = new RegExp(regex.checked ? query.value.trim() : query.value.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), regex.checked ? "g" : "gi");
-            channelId = channels?.getChannelId() || location.pathname.match(/\/channels\/(?:@me|\d+)\/(\d+)/)?.[1];
-            if (!/^\d+$/.test(channelId || "")) throw new Error("Open a text channel or DM first.");
+            channelId = riyoChannelId(target.value, channels?.getChannelId() || location.pathname.match(/\/channels\/(?:@me|\d+)\/(\d+)/)?.[1]);
             maximum = Number(limit.value);
             if (!all.checked && (!Number.isInteger(maximum) || maximum < 0 || maximum > 100)) throw new Error("Limit must be 0–100. Use 0 for cached messages.");
             if ((all.checked || maximum > 0) && !api) throw new Error("Discord's HTTP client was not found. Reload Discord and try again.");
@@ -205,7 +221,7 @@
         results.replaceChildren();
         button.textContent = "Cancel";
         button.className = "riyo-danger";
-        const inputs = [query, regex, all, limit];
+        const inputs = [target, query, regex, all, limit];
         inputs.forEach(input => { input.disabled = true; });
         let scanned = 0, before = null, outcome = "Finished";
         const seen = new Set();
