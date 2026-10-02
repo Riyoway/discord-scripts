@@ -101,7 +101,7 @@ function startDiscord() {
                 const app = running.objectAtIndex(i);
                 if (!app.bundleURL.isNil() && ObjC.unwrap(app.bundleURL.path) === path) processes.push(app);
             }
-            installed.push({ name, path, processes });
+            installed.push({ name, path, executable: ObjC.unwrap(bundle.executablePath), processes });
         });
     });
     const selected = installed.find(app => app.processes.length) || installed[0];
@@ -115,12 +115,37 @@ function startDiscord() {
         $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.5));
     }
     if (selected.processes.some(app => !app.terminated)) throw new Error('Discord did not quit. Quit it manually and try again.');
-    execute('/usr/bin/open', ['-n', '-a', selected.path, '--args', '--remote-debugging-port=9222']);
-    for (let i = 0; i < 30; i++) {
-        delay(1);
-        if (fetchText(DEBUG + '/json/version', 2, true)) return;
+    // Launch the bundle executable directly and monitor Discord, not the open helper.
+    const task = $.NSTask.alloc.init;
+    try {
+        task.executableURL = $.NSURL.fileURLWithPath(selected.executable);
+        task.arguments = ['--remote-debugging-port=9222'];
+        // Discord must outlive this runner without inheriting its terminal or pipes.
+        task.standardInput = $.NSFileHandle.fileHandleWithNullDevice;
+        task.standardOutput = $.NSFileHandle.fileHandleWithNullDevice;
+        task.standardError = $.NSFileHandle.fileHandleWithNullDevice;
+        const error = Ref();
+        if (!task.launchAndReturnError(error)) {
+            throw new Error('Could not launch ' + selected.name + ': ' + ObjC.unwrap(error[0].localizedDescription));
+        }
+        write(selected.name + ' launched. Waiting for the local debug port...\n');
+        for (let i = 0; i < 30; i++) {
+            $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(1));
+            // A refused connection during startup is expected; keep waiting silently.
+            if (fetchText(DEBUG + '/json/version', 2, true)) return;
+        }
+        throw new Error(task.running
+            ? selected.name + ' is running, but its debug port did not open within 30 seconds.'
+            : selected.name + ' exited during startup (status ' + task.terminationStatus + ').');
+    } catch (error) {
+        if (!task.running) {
+            write('Reopening ' + selected.name + ' normally...\n');
+            if (!$.NSWorkspace.sharedWorkspace.openURL($.NSURL.fileURLWithPath(selected.path))) {
+                throw new Error(error.message + ' Could not reopen Discord; open it from Applications.');
+            }
+        }
+        throw error;
     }
-    throw new Error('Debug port never opened; this Discord build may block remote debugging.');
 }
 
 function connect(url) {
