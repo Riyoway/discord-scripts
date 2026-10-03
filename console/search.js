@@ -53,6 +53,46 @@
     @media(max-width:480px){.riyo-panel{right:12px;max-width:calc(100vw - 24px);padding:16px}.riyo-ui .autoquest-panel{max-width:calc(100vw - 32px);padding:16px}.riyo-ui button{min-height:40px}}
     @media(prefers-reduced-motion:reduce){.riyo-ui *{transition:none!important;animation:none!important}}
     </style>`;
+    // A native dialog also works in Electron, where window.confirm is unsupported.
+    const riyoRunScript = (name, run) => {
+        const key = 'riyo-scripts:consent:' + name;
+        const remember = () => {
+            try { localStorage.setItem(key, 'yes'); } catch { /* Ask again if storage is unavailable. */ }
+        };
+        if (typeof riyoScriptApproved !== 'undefined' && riyoScriptApproved === name) {
+            remember();
+            return run();
+        }
+        let accepted = false;
+        try { accepted = localStorage.getItem(key) === 'yes'; } catch { /* Show the warning. */ }
+        if (accepted) return run();
+        return new Promise((resolve, reject) => {
+            const previousFocus = document.activeElement;
+            const dialog = document.createElement('dialog');
+            const titleId = 'riyo-consent-' + name;
+            dialog.className = 'riyo-ui riyo-panel riyo-consent';
+            dialog.setAttribute('aria-labelledby', titleId);
+            dialog.setAttribute('aria-describedby', titleId + '-message');
+            dialog.innerHTML = `${riyoTheme}
+                <style>.riyo-consent{top:50%;left:50%;right:auto;margin:0;transform:translate(-50%,-50%)}.riyo-consent:not([open]){display:none}.riyo-consent::backdrop{background:#0009;backdrop-filter:blur(8px)}.riyo-consent p{margin:0}.riyo-consent form{margin:0}</style>
+                <header class="riyo-header"><strong class="riyo-title" id="${titleId}">Run ${name}?</strong></header>
+                <p id="${titleId}-message">Use this script at your own risk. You are responsible for any consequences, including issues affecting your account or data.</p>
+                <form method="dialog" class="riyo-row">
+                    <button type="submit" value="no" autofocus>No</button>
+                    <button type="submit" value="yes" class="riyo-primary">Yes</button>
+                </form>`;
+            dialog.onclose = () => {
+                const accepted = dialog.returnValue === 'yes';
+                dialog.remove();
+                previousFocus?.focus?.();
+                if (!accepted) { resolve(undefined); return; }
+                remember();
+                try { resolve(run()); } catch (error) { reject(error); }
+            };
+            document.body.appendChild(dialog);
+            try { dialog.showModal(); } catch (error) { dialog.remove(); reject(error); }
+        });
+    };
     // Shared channel parsing and authenticated history access for Search and Media.
     const riyoChannelId = (input, current) => {
         const value = input.trim();
@@ -118,6 +158,7 @@
         }
     };
     // END SHARED UI
+    return riyoRunScript('search', () => {
     const old = document.getElementById("discord-search-overlay");
     if (old) { old.dispatchEvent(new Event("search-close")); old.remove(); }
     const { channels, messages, api } = riyoChannelModules();
@@ -281,4 +322,5 @@
         download(urls.length ? urls.join("\n") : matched.map(message => message.content || "").join("\n"), "txt", "text/plain;charset=utf-8");
     };
     node("export-json-btn").onclick = () => download(JSON.stringify(matched.map(({ id, timestamp, author, content }) => ({ id, timestamp, author: author ? { id: author.id, username: author.username, discriminator: author.discriminator } : null, content })), null, 2), "json", "application/json;charset=utf-8");
+    });
 })();

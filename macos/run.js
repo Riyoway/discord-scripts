@@ -14,14 +14,15 @@ function selectPage(pages) {
 }
 
 function makeExpression(name, code, input) {
-    if (name === 'token') return code;
+    const approval = 'const riyoScriptApproved=' + JSON.stringify(name) + ';';
+    if (name === 'token') return '(function(){' + approval + 'return (\n' + code.trim().replace(/;$/, '') + '\n);})()';
     if (name === 'whoami') {
-        return '(function(){const tables=[];const console={log(){},table(v){tables.push(v)},error(...v){throw new Error(v.join(" "))}};\n' + code + '\nreturn tables;})()';
+        return '(function(){' + approval + 'const tables=[];const console={log(){},table(v){tables.push(v)},error(...v){throw new Error(v.join(" "))}};\n' + code + '\nreturn tables;})()';
     }
     if (name === 'snowflake') {
-        return '(function(){let result;const prompt=(message,value)=>value===undefined?' + JSON.stringify(input) + ':(result=value);const alert=message=>{throw new Error(message)};\n' + code + '\nreturn result;})()';
+        return '(function(){' + approval + 'let result;const prompt=(message,value)=>value===undefined?' + JSON.stringify(input) + ':(result=value);const alert=message=>{throw new Error(message)};\n' + code + '\nreturn result;})()';
     }
-    return '(function(){\n' + code + '\n})()';
+    return '(function(){' + approval + '\n' + code + '\n})()';
 }
 
 function socketUrl(page) {
@@ -64,6 +65,26 @@ function copy(value) {
     if (!clipboard.setStringForType(String(value), $.NSPasteboardTypeString)) {
         throw new Error('Could not write to the clipboard.');
     }
+}
+
+function confirmScript(name) {
+    const directory = ObjC.unwrap($.NSHomeDirectory()) + '/Library/Application Support/Riyo Scripts/consent';
+    const file = directory + '/' + name + '.txt';
+    const saved = $.NSData.dataWithContentsOfFile(file);
+    if (!saved.isNil() && text(saved).trim() === 'yes') return true;
+    write('\nRiyo Scripts - ' + name + '\n');
+    write('Use this script at your own risk. You are responsible for any consequences, including issues affecting your account or data.\n');
+    while (true) {
+        const choice = readLine('Run this script? [Yes/No] (default: No): ').toLowerCase();
+        if (!choice || choice === 'no' || choice === 'n') return false;
+        if (choice === 'yes' || choice === 'y') break;
+        write('Please enter Yes or No.\n');
+    }
+    if (!$.NSFileManager.defaultManager.createDirectoryAtPathWithIntermediateDirectoriesAttributesError(directory, true, $(), $()) ||
+        !$('yes').dataUsingEncoding($.NSUTF8StringEncoding).writeToFileAtomically(file, true)) {
+        write('Could not remember your choice; you will be asked again next time.\n');
+    }
+    return true;
 }
 
 function execute(path, args, allowFailure) {
@@ -217,6 +238,7 @@ function run(argv) {
     const script = scripts.find(script => script.name === name);
     if (!script) throw new Error('Unknown Discord script: ' + name);
     if (action === 'p') { copy(commandFor(name)); write('Command copied to clipboard.\n'); return; }
+    if (action === 'r' && script.runner && !confirmScript(name)) { write('Cancelled.\n'); return; }
     write('Fetching ' + name + '...\n');
     const code = fetchText(BASE + script.source);
     if (action === 'c' || !script.runner) { copy(code); write('Source copied to clipboard.\n'); return; }

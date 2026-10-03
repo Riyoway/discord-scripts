@@ -23,6 +23,7 @@ function harness(handler, cached = []) {
     const lazy = new Proxy({}, { get: () => () => undefined });
     class LocalURL extends URL { static createObjectURL(blob) { const id = "blob:" + blobs.size; blobs.set(id, blob); return id; } static revokeObjectURL(id) { blobs.delete(id); } }
     const context = vm.createContext({
+        riyoScriptApproved: 'search',
         document, URL: LocalURL, Blob, Event, AbortController, location: { pathname: "/channels/@me/123" },
         webpackChunkdiscord_app: { push: () => ({ c: { lazy: { exports: { default: lazy } }, channels: { exports: { A: channels } }, messages: { exports: { A: messages } }, api: { exports: { Bo: api } } } }), pop() {} },
         window: { innerWidth: 1200, innerHeight: 900, addEventListener(type, fn) { if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(fn); }, removeEventListener(type, fn) { listeners.get(type)?.delete(fn); } },

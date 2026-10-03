@@ -32,7 +32,7 @@ assert.equal(tables[0].id, '123');
 const input = '123\";throw new Error("injected");//';
 assert.equal(vm.runInNewContext(runner.makeExpression('snowflake',
     'const id=prompt("ID"); prompt("Result",id);', input)), input);
-assert.equal(runner.makeExpression('token', '"secret"'), '"secret"');
+assert.equal(vm.runInNewContext(runner.makeExpression('token', '"secret"')), 'secret');
 assert.throws(() => vm.runInNewContext(runner.makeExpression('snowflake',
     'alert("Invalid ID");', 'bad')), /Invalid ID/);
 // Simulate AppKit keeping stale process state until its main run loop advances.

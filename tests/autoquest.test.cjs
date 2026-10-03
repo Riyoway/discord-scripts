@@ -114,6 +114,7 @@ function harness(quests, options = {}) {
         guilds: { exports: guilds }
     };
     const context = vm.createContext({
+        riyoScriptApproved: 'autoquest',
         window, document, URL, URLSearchParams, AbortController, EventTarget, Event, Date: ClockDate,
         webpackChunkdiscord_app: { push: () => ({ c: modules }), pop() {} },
         ...(options.desktop ? { DiscordNative: {} } : {}),

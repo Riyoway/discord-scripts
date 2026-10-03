@@ -14,6 +14,31 @@ $menuList = Get-Content "$root/powershell/menu.ps1" | Where-Object { $_ -match '
 Assert ($scripts.Count -eq $manifest.Count) 'Menu must enumerate the manifest in PowerShell 5.1 and 7'
 $shared = Get-Content "$root/powershell/run.ps1" -Raw
 $runnerAst = [Management.Automation.Language.Parser]::ParseInput($shared, [ref]$null, [ref]$null)
+& {
+    $macOS = $false
+    $script:approvals = @{}
+    $script:answers = [Collections.Generic.Queue[string]]::new()
+    function Get-Content($LiteralPath, [switch]$Raw, $ErrorAction) {
+        if (-not $script:approvals.ContainsKey($LiteralPath)) { throw 'Not approved' }
+        $script:approvals[$LiteralPath]
+    }
+    function New-Item($ItemType, $Path, [switch]$Force) { }
+    function Set-Content($LiteralPath, $Value, $Encoding) { $script:approvals[$LiteralPath] = $Value }
+    function Read-Host($Prompt) { $script:answers.Dequeue() }
+    $confirm = $runnerAst.Find({ param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -eq 'Confirm-ScriptRun' }, $true)
+    . ([scriptblock]::Create($confirm.Extent.Text))
+    $script:answers.Enqueue('invalid'); $script:answers.Enqueue('No')
+    Assert (-not (Confirm-ScriptRun 'token')) 'Invalid input must retry; No must cancel'
+    Assert ($script:approvals.Count -eq 0) 'No must not be remembered'
+    $script:answers.Enqueue('YES')
+    Assert (Confirm-ScriptRun 'token') 'Yes must approve the script'
+    Assert (Confirm-ScriptRun 'token') 'An approved script must not ask again'
+    $script:answers.Enqueue('')
+    Assert (-not (Confirm-ScriptRun 'media')) 'Approval must be per script; blank must cancel'
+    function Invoke-RestMethod { throw 'A cancelled script must not fetch source or reach Discord' }
+    $script:answers.Enqueue('No')
+    & ([scriptblock]::Create($shared)) -Name 'search'
+}
 $macBranch = $runnerAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text -eq '$macOS' }, $true).Clauses[0].Item2.Extent.Text
 & {
     $port = 9222
@@ -30,7 +55,10 @@ $macBranch = $runnerAst.Find({ param($node) $node -is [Management.Automation.Lan
     Assert ($script:launch[0] -eq '-n' -and $script:launch[1] -eq '-a' -and $script:launch[2] -eq $app.Bundle) 'Must launch the selected bundle with separate native arguments'
     Assert ($script:launch[3] -eq '--args' -and $script:launch[4] -eq '--remote-debugging-port=9222') 'macOS launch must pass the debug port'
 }
-$prefix = [scriptblock]::Create($shared.Substring(0, $shared.IndexOf('# Ensure the desktop')) + "`nreturn `$expr")
+$prefixSource = $shared.Substring(0, $shared.IndexOf('# Ensure the desktop'))
+# Skip only the terminal consent call while checking approved injection expressions.
+$prefixSource = $prefixSource.Replace("if (-not (Confirm-ScriptRun `$Name)) { Write-Host 'Cancelled.'; return }", '')
+$prefix = [scriptblock]::Create($prefixSource + "`nreturn `$expr")
 # These mocks apply only to this check. No Discord process, network, or clipboard is touched.
 function Invoke-RestMethod($Uri, $TimeoutSec) {
     $scriptName = $Uri.Split('/')[-1]

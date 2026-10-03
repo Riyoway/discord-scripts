@@ -3,21 +3,42 @@ param([Parameter(Mandatory = $true)][ValidateSet('autoquest', 'token', 'timestam
 $ErrorActionPreference = "Stop"
 $macOS = $PSVersionTable.PSEdition -eq 'Core' -and $IsMacOS
 if (-not $macOS -and $env:OS -ne 'Windows_NT') { throw 'This runner supports Windows and macOS (PowerShell 7).' }
+function Confirm-ScriptRun($scriptName) {
+    $directory = if ($macOS) { Join-Path $HOME 'Library/Application Support/Riyo Scripts/consent' }
+        else { Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Riyo Scripts/consent' }
+    $file = Join-Path $directory "$scriptName.txt"
+    try { if ((Get-Content -LiteralPath $file -Raw -ErrorAction Stop).Trim() -eq 'yes') { return $true } } catch { }
+    Write-Host "`nRiyo Scripts - $scriptName"
+    Write-Host 'Use this script at your own risk. You are responsible for any consequences, including issues affecting your account or data.'
+    while ($true) {
+        $choice = ([string](Read-Host 'Run this script? [Yes/No] (default: No)')).Trim()
+        if ($choice -match '^(no|n)?$') { return $false }
+        if ($choice -match '^(yes|y)$') { break }
+        Write-Host 'Please enter Yes or No.'
+    }
+    try {
+        [void](New-Item -ItemType Directory -Path $directory -Force)
+        Set-Content -LiteralPath $file -Value 'yes' -Encoding ASCII
+    } catch { Write-Host 'Could not remember your choice; you will be asked again next time.' }
+    return $true
+}
+if (-not (Confirm-ScriptRun $Name)) { Write-Host 'Cancelled.'; return }
 $port = 9222
 Write-Host "Fetching $Name..." -ForegroundColor Cyan
 $code = Invoke-RestMethod "https://script.riyo.me/d/c/$Name" -TimeoutSec 30
-$expr = "(function(){`n$code`n})()"
-if ($Name -eq 'token') { $expr = $code }
+$approval = "const riyoScriptApproved='$Name';"
+$expr = "(function(){${approval}`n$code`n})()"
+if ($Name -eq 'token') { $expr = "(function(){${approval}return (`n$($code.Trim().TrimEnd(';'))`n);})()" }
 if ($Name -eq 'whoami') {
     # Return console tables to PowerShell without changing the client's console.
-    $expr = "(function(){const tables=[];const console={log(){},table(v){tables.push(v)},error(...v){throw new Error(v.join(' '))}};`n$code`nreturn tables;})()"
+    $expr = "(function(){${approval}const tables=[];const console={log(){},table(v){tables.push(v)},error(...v){throw new Error(v.join(' '))}};`n$code`nreturn tables;})()"
 }
 if ($Name -eq 'snowflake') {
     $inputId = Read-Host 'Discord ID or message link (blank to cancel)'
     if ([string]::IsNullOrWhiteSpace($inputId)) { return }
     $inputJson = ConvertTo-Json -InputObject $inputId -Compress
     # Electron does not support window.prompt; collect input here and return the result.
-    $expr = "(function(){let result;const prompt=(message,value)=>value===undefined?${inputJson}:(result=value);const alert=message=>{throw new Error(message)};`n$code`nreturn result;})()"
+    $expr = "(function(){${approval}let result;const prompt=(message,value)=>value===undefined?${inputJson}:(result=value);const alert=message=>{throw new Error(message)};`n$code`nreturn result;})()"
 }
 # Ensure the desktop client is running with the debug port open.
 function Test-Port { try { Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec 2 | Out-Null; $true } catch { $false } }

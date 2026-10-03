@@ -63,6 +63,7 @@ function harness(base, imagePaths, videoPaths = [], history) {
         static revokeObjectURL(key) { blobs.delete(key); }
     }
     const context = vm.createContext({
+        riyoScriptApproved: 'media',
         document, location: { href: base }, fetch, URL: LocalURL, Blob,
         TextEncoder, AbortController, Event, console: { warn() {} },
         window: { open() { throw new Error("A popup was opened."); } },

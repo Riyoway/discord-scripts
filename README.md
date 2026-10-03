@@ -21,6 +21,10 @@ For drafting and formatting messages without running code inside Discord, use th
 
 Every script runs in Discord's DevTools console, in the desktop app or on discord.com.
 
+Each script asks **Yes/No** before its first run: "Use this script at your own risk. You are responsible for any consequences, including issues affecting your account or data." **No**, an empty answer, or dismissing the dialog cancels execution. **Yes** remembers that script's approval. Menus, browsing, and copying do not require approval; choosing Run from a menu does.
+
+Terminal runners ask before fetching or injecting the script and before restarting Discord. Approvals are stored per OS user in `%LOCALAPPDATA%/Riyo Scripts/consent` on Windows or `~/Library/Application Support/Riyo Scripts/consent` on macOS. Console scripts use a styled Yes/No dialog and remember approvals in Discord's local storage. Desktop injection carries the terminal approval into the console script, so it does not ask twice. Deleting the corresponding approval file or clearing Discord's local storage restores the warning in that environment. If saving the choice fails, the next run asks again.
+
 1. Copy the script. The console form of every script is at `/d/c/<name>`. Open `https://script.riyo.me/d/c/autoquest` in any browser, press `Ctrl+A`, then `Ctrl+C`. Or copy it from a terminal:
 
    ```powershell
@@ -137,7 +141,7 @@ Automating Discord with a user account breaks Discord's Terms of Service. Use th
 
 ## Adding a script
 
-Overlay scripts share the black glass theme and inline SVG icons in `ui/theme.js`. After editing it, run `node scripts/sync-ui.cjs` to embed the updated assets in AutoQuest, Media, Search, Timestamp, Export, and Snowflake. Each published console script remains standalone and loads no UI assets from external hosts. Use `node scripts/sync-ui.cjs --check` to detect stale copies. Snowflake uses the panel in DevTools and retains terminal input/output in desktop runners.
+Scripts share the black glass theme and inline SVG icons in `ui/theme.js`, and first-run confirmation in `ui/consent.js`. After editing either, run `node scripts/sync-ui.cjs` to embed the updated assets in every console script from `scripts.json`. Each published console script remains standalone and loads no UI assets from external hosts. Use `node scripts/sync-ui.cjs --check` to detect stale copies. Snowflake uses the panel in DevTools and retains terminal input/output in desktop runners. The offline consent check is `node tests/consent.test.cjs`.
 
 Search and Media also embed `ui/channels.js`, sharing channel input parsing, module lookup, cancellable request waits, and bounded rate-limit retries. Sync after editing this file too.
 
