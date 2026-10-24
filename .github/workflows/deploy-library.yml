@@ -1,0 +1,30 @@
+name: Deploy script library
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'console/**'
+      - 'powershell/**'
+      - 'macos/**'
+      - 'scripts.json'
+      - 'LICENSE'
+      - '.github/workflows/deploy-library.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: deploy-script-library
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Cloudflare Pages build
+        env:
+          PAGES_DEPLOY_HOOK: ${{ secrets.PAGES_DEPLOY_HOOK }}
+        run: |
+          test -n "$PAGES_DEPLOY_HOOK" || { echo "Missing PAGES_DEPLOY_HOOK secret"; exit 1; }
+          curl --fail --silent --show-error --retry 3 --request POST "$PAGES_DEPLOY_HOOK" --output /dev/null
