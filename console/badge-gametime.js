@@ -106,11 +106,11 @@
         }
 
         const DEFAULTS = Object.freeze({
-            totalHours: 6000,
+            totalHours: 1000,
             titles: 250,
             batchSize: 25,
             delayMs: 450,
-            wobble: false
+            wobble: true
         });
 
         const GAMES_URL =
@@ -262,6 +262,7 @@
                     <input
                         id="gt-wobble"
                         type="checkbox"
+                        ${DEFAULTS.wobble ? "checked" : ""}
                     >
                     ±3% time wobble
                 </label>
