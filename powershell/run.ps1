@@ -43,7 +43,13 @@ if ($Name -eq 'snowflake') {
     $expr = "(function(){${approval}let result;const prompt=(message,value)=>value===undefined?${inputJson}:(result=value);const alert=message=>{throw new Error(message)};`n$code`nreturn result;})()"
 }
 # Ensure the desktop client is running with the debug port open.
-function Test-Port { try { Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec 2 | Out-Null; $true } catch { $false } }
+$startupWait = [Diagnostics.Stopwatch]::StartNew()
+function Get-DiscordStartupTimeout($MaximumMilliseconds) {
+    $remainingSeconds = [Math]::Floor((60000 - $startupWait.Elapsed.TotalMilliseconds) / 1000)
+    if ($remainingSeconds -lt 1) { throw 'Discord startup timed out (60-second limit). Open Discord, wait for it to load, and try again.' }
+    [int][Math]::Min($MaximumMilliseconds, $remainingSeconds * 1000)
+}
+function Test-Port { try { Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec ((Get-DiscordStartupTimeout 2000) / 1000) | Out-Null; $true } catch { $false } }
 function Test-DiscordRunning {
     if ($macOS) {
         $PSNativeCommandUseErrorActionPreference = $false
@@ -58,7 +64,9 @@ function Test-DiscordRunning {
 }
 function Wait-Discord($Probe, $Message, $StartupAttempts = 0) {
     for ($attempt = 0; ; $attempt++) {
+        $null = Get-DiscordStartupTimeout 1000
         $result = & $Probe $attempt
+        $null = Get-DiscordStartupTimeout 1000
         if ($result) { return $result }
         $running = Test-DiscordRunning
         if (-not $running -and $attempt -ge $StartupAttempts) {
@@ -121,7 +129,7 @@ if (-not (Test-Port)) {
 # Find the main Discord window (each /json call is capped so a stuck port can't hang us).
 Write-Host "Locating the Discord window..." -ForegroundColor Cyan
 $page = Wait-Discord {
-    try { $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 3 | ForEach-Object { $_ } | Where-Object { $_.type -eq 'page' -and $_.url -match '^https://(?:[a-z0-9-]+\.)?discord\.com/(?:channels|quest-home|app)(?:/|$)' } } catch { return $null }
+    try { $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec ((Get-DiscordStartupTimeout 3000) / 1000) | ForEach-Object { $_ } | Where-Object { $_.type -eq 'page' -and $_.url -match '^https://(?:[a-z0-9-]+\.)?discord\.com/(?:channels|quest-home|app)(?:/|$)' } } catch { return $null }
     $preferred = $pages | Where-Object { $_.url -match '/channels|/app' } | Select-Object -First 1
     if ($preferred) { return $preferred }
     $pages | Select-Object -First 1
@@ -129,7 +137,7 @@ $page = Wait-Discord {
 
 $ws = [Net.WebSockets.ClientWebSocket]::new()
 try {
-    $connectCancellation = [Threading.CancellationTokenSource]::new(5000)
+    $connectCancellation = [Threading.CancellationTokenSource]::new((Get-DiscordStartupTimeout 5000))
     try { [void]$ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $connectCancellation.Token).GetAwaiter().GetResult() }
     finally { $connectCancellation.Dispose() }
     $cdpSequence = [ref]0
@@ -157,7 +165,7 @@ try {
     }
 
     # The renderer may still be booting; wait for its webpack registry before injecting.
-    $null = Wait-Discord { (Invoke-Cdp "typeof webpackChunkdiscord_app" 3000).result.result.value -eq 'object' } 'Waiting for Discord to finish loading.'
+    $null = Wait-Discord { (Invoke-Cdp "typeof webpackChunkdiscord_app" (Get-DiscordStartupTimeout 3000)).result.result.value -eq 'object' } 'Waiting for Discord to finish loading.'
 
     Write-Host "Injecting..." -ForegroundColor Cyan
     $reply = Invoke-Cdp $expr
