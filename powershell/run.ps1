@@ -24,6 +24,8 @@ function Confirm-ScriptRun($scriptName) {
 }
 if (-not (Confirm-ScriptRun $Name)) { Write-Host 'Cancelled.'; return }
 $port = 9222
+$flavor = $null
+$app = $null
 Write-Host "Fetching $Name..." -ForegroundColor Cyan
 $code = Invoke-RestMethod "https://script.riyo.me/d/c/$Name" -TimeoutSec 30
 $approval = "const riyoScriptApproved='$Name';"
@@ -42,6 +44,33 @@ if ($Name -eq 'snowflake') {
 }
 # Ensure the desktop client is running with the debug port open.
 function Test-Port { try { Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec 2 | Out-Null; $true } catch { $false } }
+function Test-DiscordRunning {
+    if ($macOS) {
+        $PSNativeCommandUseErrorActionPreference = $false
+        $pattern = if ($app) { "^$([regex]::Escape($app.Executable))([[:space:]]|$)" }
+            else { '/(Discord|Discord PTB|Discord Canary|Discord Development)\.app/Contents/MacOS/' }
+        $ids = @(& /usr/bin/pgrep -f $pattern)
+        if ($LASTEXITCODE -gt 1) { throw 'Could not inspect running Discord applications.' }
+        return @($ids | Where-Object { $_ -match '^\d+$' }).Count -gt 0
+    }
+    $names = if ($flavor) { @($flavor) } else { @('Discord', 'DiscordPTB', 'DiscordCanary', 'DiscordDevelopment') }
+    return @(Get-Process -Name $names -ErrorAction SilentlyContinue).Count -gt 0
+}
+function Wait-Discord($Probe, $Message, $StartupAttempts = 0) {
+    for ($attempt = 0; ; $attempt++) {
+        $result = & $Probe $attempt
+        if ($result) { return $result }
+        $running = Test-DiscordRunning
+        if (-not $running -and $attempt -ge $StartupAttempts) {
+            throw "$Message Discord is no longer running. Open Discord and try again."
+        }
+        if ($attempt % 15 -eq 0) {
+            $state = if ($running) { 'Discord is still running; waiting' } else { 'Waiting for Discord to start' }
+            Write-Host "$Message $state (Ctrl+C to cancel)..." -ForegroundColor DarkGray
+        }
+        Start-Sleep -Seconds 1
+    }
+}
 if (-not (Test-Port)) {
     if ($macOS) {
         # pgrep exit 1 means that the selected application is not running.
@@ -86,27 +115,26 @@ if (-not (Test-Port)) {
     Start-Sleep 2
     & "$env:LOCALAPPDATA\$flavor\Update.exe" --processStart "$flavor.exe" --process-start-args "--remote-debugging-port=$port"
     }
-    $ok = $false; for ($i = 0; $i -lt 30; $i++) { Start-Sleep 1; if (Test-Port) { $ok = $true; break } }
-    if (-not $ok) { throw "Debug port never opened; this Discord build may block --remote-debugging-port." }
+    $null = Wait-Discord { Test-Port } 'Waiting for the debug port.' 30
 }
 
 # Find the main Discord window (each /json call is capped so a stuck port can't hang us).
 Write-Host "Locating the Discord window..." -ForegroundColor Cyan
-$page = $null
-for ($i = 0; $i -lt 20 -and -not $page; $i++) {
-    Start-Sleep 1
-    try { $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 3 | ForEach-Object { $_ } | Where-Object { $_.type -eq 'page' -and $_.url -match '^https://(?:[a-z0-9-]+\.)?discord\.com/(?:channels|quest-home|app)(?:/|$)' } } catch { continue }
-    $page = ($pages | Where-Object { $_.url -match '/channels|/app' } | Select-Object -First 1)
-    if (-not $page) { $page = $pages | Select-Object -First 1 }
-}
-if (-not $page) { throw "No Discord window found on the debug port. Open the main window and log in first." }
+$page = Wait-Discord {
+    try { $pages = Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec 3 | ForEach-Object { $_ } | Where-Object { $_.type -eq 'page' -and $_.url -match '^https://(?:[a-z0-9-]+\.)?discord\.com/(?:channels|quest-home|app)(?:/|$)' } } catch { return $null }
+    $preferred = $pages | Where-Object { $_.url -match '/channels|/app' } | Select-Object -First 1
+    if ($preferred) { return $preferred }
+    $pages | Select-Object -First 1
+} 'Waiting for the main window. Open Discord and log in if needed.'
 
 $ws = [Net.WebSockets.ClientWebSocket]::new()
 try {
     $connectCancellation = [Threading.CancellationTokenSource]::new(5000)
     try { [void]$ws.ConnectAsync([Uri]$page.webSocketDebuggerUrl, $connectCancellation.Token).GetAwaiter().GetResult() }
     finally { $connectCancellation.Dispose() }
-    function Invoke-Cdp($id, $e, $timeoutMs = 8000) {
+    $cdpSequence = [ref]0
+    function Invoke-Cdp($e, $timeoutMs = 8000) {
+        $id = ++$cdpSequence.Value
         $cts = [Threading.CancellationTokenSource]::new($timeoutMs)
         try {
             $msg = @{ id = $id; method = "Runtime.evaluate"; params = @{ expression = $e; userGesture = $true; awaitPromise = $false; returnByValue = $true } } | ConvertTo-Json -Compress -Depth 5
@@ -129,15 +157,10 @@ try {
     }
 
     # The renderer may still be booting; wait for its webpack registry before injecting.
-    $ready = $false
-    for ($i = 0; $i -lt 20; $i++) {
-        if ((Invoke-Cdp $i "typeof webpackChunkdiscord_app" 3000).result.result.value -eq 'object') { $ready = $true; break }
-        Start-Sleep 1
-    }
-    if (-not $ready) { throw "Discord did not finish loading. Log in and try again." }
+    $null = Wait-Discord { (Invoke-Cdp "typeof webpackChunkdiscord_app" 3000).result.result.value -eq 'object' } 'Waiting for Discord to finish loading.'
 
     Write-Host "Injecting..." -ForegroundColor Cyan
-    $reply = Invoke-Cdp 100 $expr
+    $reply = Invoke-Cdp $expr
 } finally { $ws.Dispose() }
 if (-not $reply) { throw "Timed out waiting for Discord to run the script." }
 if ($reply.result.exceptionDetails) {

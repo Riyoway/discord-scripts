@@ -77,6 +77,8 @@ macOS launch, networking, and clipboard behavior have not been verified on a phy
 
 Offline runner check: `powershell -File tests/powershell.test.ps1`. This checks registration, syntax, and terminal input/output without launching Discord.
 
+The PowerShell runner keeps waiting for the debug port, main window, and renderer while the selected Discord process is running. It prints a status message every 15 checks; press `Ctrl+C` to cancel. If Discord exits, the wait ends with an error. A newly launched updater gets 30 initial checks to spawn the app. Slow-start checks: `pwsh -NoProfile -File tests/powershell-wait.test.ps1` (also supports Windows PowerShell).
+
 The runner reuses an existing debugging endpoint when available; otherwise it quits Discord (interrupting any call), relaunches it with `--remote-debugging-port=9222`, and runs the script in the main window. The debug port stays open until Discord is restarted normally; while it is open, any local program can run code in your Discord, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`; verify with `irm http://127.0.0.1:9222/json/version` after launch.
 
 DevTools is disabled in the desktop app by default. To enable it, add this line to `%APPDATA%\discord\settings.json` (macOS: `~/Library/Application Support/discord/settings.json`), then restart Discord:
