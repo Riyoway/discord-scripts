@@ -1,5 +1,5 @@
 # Shared Discord desktop injector. Called by the named runners.
-param([Parameter(Mandatory = $true)][ValidateSet('autoquest', 'token', 'timestamp', 'media', 'whoami', 'export', 'snowflake', 'search', 'gametime')][string]$Name)
+param([Parameter(Mandatory = $true)][ValidateSet('autoquest', 'token', 'timestamp', 'media', 'whoami', 'export', 'snowflake', 'search', 'badge-gametime')][string]$Name)
 $ErrorActionPreference = "Stop"
 $macOS = $PSVersionTable.PSEdition -eq 'Core' -and $IsMacOS
 if (-not $macOS -and $env:OS -ne 'Windows_NT') { throw 'This runner supports Windows and macOS (PowerShell 7).' }

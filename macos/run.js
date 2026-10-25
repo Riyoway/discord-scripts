@@ -226,7 +226,7 @@ function run(argv) {
     let action = 'r';
     if (name === 'menu') {
         write('\nRiyo Scripts / Discord\n\n');
-        scripts.forEach((script, index) => write((index + 1) + '. ' + script.name + ' — ' + script.desc + '\n'));
+        scripts.forEach((script, index) => write((index + 1) + '. ' + (script.displayName || script.name) + ' — ' + script.desc + '\n'));
         const choice = readLine('\nPick a number (blank to cancel): ');
         if (!choice) return;
         if (!/^\d+$/.test(choice) || !scripts[Number(choice) - 1]) throw new Error('Invalid script number.');

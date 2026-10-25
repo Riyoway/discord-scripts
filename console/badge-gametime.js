@@ -1,4 +1,4 @@
-// gametime — local game-time planner / dry-run simulator.
+// badge-gametime — Discord Game Time & Game Variety Badge planner / dry-run simulator.
 (async () => {
     // BEGIN SHARED UI
     // Embedded by scripts/sync-ui.cjs so every console script works without remote UI assets.
@@ -95,8 +95,8 @@
     };
     // END SHARED UI
 
-    return riyoRunScript("gametime", async () => {
-        const OLD_ID = "riyo-gametime-panel";
+    return riyoRunScript("badge-gametime", async () => {
+        const OLD_ID = "riyo-badge-gametime-panel";
         const previous = document.getElementById(OLD_ID);
 
         if (previous) {
@@ -196,7 +196,7 @@
             <header class="riyo-header">
                 <strong class="riyo-title">
                     ${riyoIcon("clock")}
-                    Game Time
+                    Discord Game Time &amp; Game Variety Badge
                 </strong>
 
                 <button
@@ -504,7 +504,7 @@
 
                         progress.value = absoluteIndex + 1;
 
-                        console.log("[gametime dry-run]", {
+                        console.log("[badge-gametime dry-run]", {
                             index: absoluteIndex + 1,
                             game: getName(game),
                             gameId: game?.id,
@@ -527,7 +527,7 @@
                         `${config.totalHours.toLocaleString()} total hours.`;
                 }
             } catch (error) {
-                console.error("[gametime]", error);
+                console.error("[badge-gametime]", error);
 
                 status.textContent =
                     error?.message ||

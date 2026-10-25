@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const test = require('node:test');
-const source = fs.readFileSync(path.join(__dirname, '../console/gametime.js'), 'utf8');
+const source = fs.readFileSync(path.join(__dirname, '../console/badge-gametime.js'), 'utf8');
 const catalog = [
     { id: 'one', name: 'First', executables: [{ os: 'win32' }] },
     { id: 'two', names: { default: 'Second' }, executables: [{ platform: 'windows' }] },
@@ -34,7 +34,7 @@ async function harness(response = { ok: true, json: async () => catalog }) {
     const calls = [], allocations = [], errors = [];
     let onSleep;
     const context = vm.createContext({
-        riyoScriptApproved: 'gametime',
+        riyoScriptApproved: 'badge-gametime',
         localStorage: { setItem() {} },
         document: { body, createElement: () => new Element(), getElementById: id => body.children.find(node => node.id === id) },
         console: { log: (label, data) => allocations.push(data), error: (...args) => errors.push(args) },

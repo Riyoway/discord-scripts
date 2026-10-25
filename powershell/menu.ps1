@@ -11,12 +11,13 @@ $categories = @($scripts | Group-Object { if ($_.category) { $_.category } else 
 
 function Resolve-ScriptUrl($path) { if ($path -match '^https?://') { $path } else { "$BASE$path" } }
 function Copy-Source($script) { Set-Clipboard -Value (Invoke-RestMethod (Resolve-ScriptUrl $script.source)) }
+function Get-ScriptLabel($script) { if ($script.displayName) { $script.displayName } else { $script.name } }
 
 function Select-Item($items, $title, $category = $false) {
     if ([Console]::IsInputRedirected) {
         for ($i = 0; $i -lt $items.Count; $i++) {
             if ($category) { "{0,2}. {1,-11} {2} scripts" -f ($i + 1), $items[$i].Name, $items[$i].Count }
-            else { "{0,2}. {1,-11} {2}" -f ($i + 1), $items[$i].name, $items[$i].desc }
+            else { "{0,2}. {1,-11} {2}" -f ($i + 1), (Get-ScriptLabel $items[$i]), $items[$i].desc }
         }
         $idx = [int](Read-Host "`nPick a number") - 1
         if ($idx -ge 0 -and $idx -lt $items.Count) { return $items[$idx] }
@@ -36,7 +37,7 @@ function Select-Item($items, $title, $category = $false) {
             else {
                 $s = $items[$i]
                 $tag = if ($s.runner) { "run" } else { "   " }
-                $line = "  {0,-11} {1}  {2}" -f $s.name, $tag, $s.desc
+                $line = "  {0,-11} {1}  {2}" -f (Get-ScriptLabel $s), $tag, $s.desc
             }
             if ($i -eq $sel) { Write-Host $line -ForegroundColor Black -BackgroundColor Cyan }
             else { Write-Host $line }
