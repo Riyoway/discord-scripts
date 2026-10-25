@@ -1,6 +1,42 @@
 // Native macOS runner. Uses JXA, Foundation, and AppKit; no additional runtime.
 const BASE = 'https://script.riyo.me';
-const DEBUG = 'http://127.0.0.1:9222';
+function debugBase(port) { return 'http://127.0.0.1:' + port; }
+
+function parseOptions(argv) {
+    let name = 'menu', client = null, i = 0;
+    if (argv[0] && !argv[0].startsWith('--')) { name = argv[0]; i++; }
+    while (i < argv.length) {
+        if (argv[i] !== '--client' || !argv[i + 1]) throw new Error('Use --client followed by a client name or PID.');
+        client = argv[i + 1]; i += 2;
+    }
+    return { name, client };
+}
+
+function choose(items, title, label) {
+    if (items.length === 1) return items[0];
+    write('\n' + title + '\n');
+    items.forEach((item, index) => write((index + 1) + '. ' + label(item) + '\n'));
+    while (true) {
+        const answer = readLine('Pick a number (blank to cancel): ');
+        if (!answer) return null;
+        if (/^[1-9]\d*$/.test(answer) && items[Number(answer) - 1]) return items[Number(answer) - 1];
+        write('Choose one of the listed numbers.\n');
+    }
+}
+
+function chooseClient(items, requested) {
+    let choices = items;
+    if (requested) {
+        const value = String(requested).toLowerCase();
+        choices = items.filter(item => item.name.toLowerCase() === value || item.key === value || (item.pid && String(item.pid) === value));
+        if (!choices.length) throw new Error('Discord client not found: ' + requested);
+    } else {
+        const running = items.filter(item => item.pid);
+        if (running.length) choices = running;
+    }
+    if (!choices.length) throw new Error('No Discord app found in /Applications or ~/Applications.');
+    return choose(choices, 'Choose the Discord client to use:', item => item.name + (item.pid ? ' (PID ' + item.pid + ')' : ' (not running)') + ' - ' + item.path);
+}
 
 function commandFor(name) {
     if (!/^[a-z][a-z0-9-]*$/.test(name)) throw new Error('Invalid script name.');
@@ -8,9 +44,12 @@ function commandFor(name) {
 }
 
 function selectPage(pages) {
-    const matches = pages.filter(page => page.type === 'page' &&
-        /^https:\/\/(?:[a-z0-9-]+\.)?discord\.com\/(?:channels|quest-home|app)(?:\/|$)/.test(page.url));
-    return matches.find(page => /\/(?:channels|app)(?:\/|$)/.test(page.url)) || matches[0];
+    const matches = discordPages(pages);
+    return matches.length ? choose(matches, 'Choose the Discord window:', page => (page.title || 'Discord') + ' - ' + page.url) : undefined;
+}
+
+function discordPages(pages) {
+    return pages.filter(page => page.type === 'page' && /^https:\/\/(?:[a-z0-9-]+\.)?discord\.com\/(?:channels|quest-home|app)(?:\/|$)/.test(page.url));
 }
 
 function makeExpression(name, code, input) {
@@ -25,9 +64,9 @@ function makeExpression(name, code, input) {
     return '(function(){' + approval + '\n' + code + '\n})()';
 }
 
-function socketUrl(page) {
+function socketUrl(page, port) {
     // The discovery endpoint must never redirect the injector to a remote socket.
-    if (!/^ws:\/\/127\.0\.0\.1:9222\/devtools\/page\/[a-z0-9-]+$/i.test(page.webSocketDebuggerUrl)) {
+    if (!new RegExp('^ws://127\\.0\\.0\\.1:' + port + '/devtools/page/[a-z0-9-]+$', 'i').test(page.webSocketDebuggerUrl)) {
         throw new Error('Unexpected Discord debug socket URL.');
     }
     return page.webSocketDebuggerUrl;
@@ -108,11 +147,11 @@ function fetchText(url, timeout, allowFailure) {
     return execute('/usr/bin/curl', ['-fsSL', '--max-time', String(timeout || 30), url], allowFailure);
 }
 
-function startDiscord() {
+function getClients() {
     const running = $.NSWorkspace.sharedWorkspace.runningApplications;
     const installed = [];
     ['/Applications', ObjC.unwrap($.NSHomeDirectory()) + '/Applications'].forEach(directory => {
-        ['Discord', 'Discord PTB', 'Discord Canary', 'Discord Development'].forEach(name => {
+        ['Discord', 'Discord PTB', 'Discord Canary', 'Discord Development'].forEach((name, variant) => {
             const path = directory + '/' + name + '.app';
             const bundle = $.NSBundle.bundleWithPath(path);
             if (bundle.isNil() || bundle.executablePath.isNil() ||
@@ -122,17 +161,66 @@ function startDiscord() {
                 const app = running.objectAtIndex(i);
                 if (!app.bundleURL.isNil() && ObjC.unwrap(app.bundleURL.path) === path) processes.push(app);
             }
-            installed.push({ name, path, executable: ObjC.unwrap(bundle.executablePath), processes });
+            const instances = processes.length;
+            if (instances) processes.forEach(app => installed.push({ name, key: ['stable','ptb','canary','development'][variant], path, executable: ObjC.unwrap(bundle.executablePath), processes: [app], pid: Number(app.processIdentifier), instances, defaultPort: 9222 + variant }));
+            else installed.push({ name, key: ['stable','ptb','canary','development'][variant], path, executable: ObjC.unwrap(bundle.executablePath), processes: [], pid: 0, instances: 0, defaultPort: 9222 + variant });
         });
     });
-    const selected = installed.find(app => app.processes.length) || installed[0];
-    if (!selected) throw new Error('No Discord app found in /Applications or ~/Applications.');
+    return installed;
+}
+
+function parseListeners(output) {
+    let pid = 0;
+    const result = [];
+    String(output || '').split('\n').forEach(line => {
+        let match = /^p(\d+)$/.exec(line);
+        if (match) pid = Number(match[1]);
+        else if ((match = /^n(?:127\.0\.0\.1|0\.0\.0\.0|\*):(\d+)$/.exec(line))) result.push({ pid, port: Number(match[1]) });
+    });
+    return result;
+}
+
+function getListeners() {
+    return parseListeners(execute('/usr/sbin/lsof', ['-nP', '-iTCP', '-sTCP:LISTEN', '-Fpn'], true));
+}
+
+function ownsPort(selected, port) {
+    return !!selected.pid && getListeners().some(listener => listener.pid === selected.pid && listener.port === port);
+}
+
+function testPort(selected, port, deadline) {
+    if (!ownsPort(selected, port)) return false;
+    const value = fetchText(debugBase(port) + '/json/version', Math.min(2, remainingSeconds(deadline)), true);
+    try { const version = JSON.parse(value || 'null'); return !!(version && version.Browser && version['Protocol-Version']); }
+    catch (_) { return false; }
+}
+
+function remainingSeconds(deadline) {
+    const seconds = Math.floor((deadline - Date.now()) / 1000);
+    if (seconds < 1) throw new Error('Discord startup timed out (60-second limit). Open Discord, wait for it to load, and try again.');
+    return seconds;
+}
+
+function clientRunning(selected) {
+    return selected.task ? !!selected.task.running : selected.processes.some(app => !app.terminated);
+}
+
+function startDiscord(selected, port, deadline) {
+    if (selected.instances > 1) throw new Error('This app has multiple instances. Start the intended instance with its own --remote-debugging-port before injecting.');
+    if (selected.pid) {
+        const command = execute('/bin/ps', ['-ww', '-p', String(selected.pid), '-o', 'command='], true);
+        if (!command) throw new Error('Could not inspect the selected client arguments.');
+        if (/(?:^|\s)"?--(?:user-data-dir|profile-directory)(?:=|\s)/i.test(command)) {
+            throw new Error('Start this custom profile with its own --remote-debugging-port before injecting.');
+        }
+    }
     write('Starting ' + selected.name + ' with remote debugging (restarting it will drop any call)...\n');
     selected.processes.forEach(app => {
         if (!app.terminate) throw new Error('Could not quit Discord. Quit it manually and try again.');
     });
     // AppKit refreshes termination state only when the main run loop advances.
     for (let i = 0; i < 20 && selected.processes.some(app => !app.terminated); i++) {
+        remainingSeconds(deadline);
         $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(0.5));
     }
     if (selected.processes.some(app => !app.terminated)) throw new Error('Discord did not quit. Quit it manually and try again.');
@@ -140,7 +228,7 @@ function startDiscord() {
     const task = $.NSTask.alloc.init;
     try {
         task.executableURL = $.NSURL.fileURLWithPath(selected.executable);
-        task.arguments = ['--remote-debugging-port=9222'];
+        task.arguments = ['--remote-debugging-port=' + port];
         // Discord must outlive this runner without inheriting its terminal or pipes.
         task.standardInput = $.NSFileHandle.fileHandleWithNullDevice;
         task.standardOutput = $.NSFileHandle.fileHandleWithNullDevice;
@@ -149,15 +237,16 @@ function startDiscord() {
         if (!task.launchAndReturnError(error)) {
             throw new Error('Could not launch ' + selected.name + ': ' + ObjC.unwrap(error[0].localizedDescription));
         }
+        selected.task = task;
+        selected.pid = Number(task.processIdentifier);
         write(selected.name + ' launched. Waiting for the local debug port...\n');
-        for (let i = 0; i < 30; i++) {
+        for (let i = 0; ; i++) {
+            remainingSeconds(deadline);
             $.NSRunLoop.currentRunLoop.runUntilDate($.NSDate.dateWithTimeIntervalSinceNow(1));
             // A refused connection during startup is expected; keep waiting silently.
-            if (fetchText(DEBUG + '/json/version', 2, true)) return;
+            if (testPort(selected, port, deadline)) return;
+            if (!task.running) throw new Error(selected.name + ' exited during startup (status ' + task.terminationStatus + ').');
         }
-        throw new Error(task.running
-            ? selected.name + ' is running, but its debug port did not open within 30 seconds.'
-            : selected.name + ' exited during startup (status ' + task.terminationStatus + ').');
     } catch (error) {
         if (!task.running) {
             write('Reopening ' + selected.name + ' normally...\n');
@@ -220,9 +309,10 @@ function connect(url) {
 
 function run(argv) {
     ObjC.import('AppKit');
+    const options = parseOptions(argv);
     const scripts = JSON.parse(fetchText(BASE + '/d/list')).filter(script =>
         script.category === 'Discord' && /^[a-z][a-z0-9-]*$/.test(script.name) && script.source === '/d/c/' + script.name);
-    let name = argv[0] || 'menu';
+    let name = options.name;
     let action = 'r';
     if (name === 'menu') {
         write('\nRiyo Scripts / Discord\n\n');
@@ -244,23 +334,41 @@ function run(argv) {
     if (action === 'c' || !script.runner) { copy(code); write('Source copied to clipboard.\n'); return; }
     const input = name === 'snowflake' ? readLine('Discord ID or message link (blank to cancel): ') : null;
     if (name === 'snowflake' && !input) return;
-    if (!fetchText(DEBUG + '/json/version', 2, true)) startDiscord();
-    write('Locating the Discord window...\n');
-    let page;
-    for (let i = 0; i < 20 && !page; i++) {
-        const response = fetchText(DEBUG + '/json', 3, true);
-        if (response) page = selectPage(JSON.parse(response));
-        if (!page) delay(1);
+    const selected = chooseClient(getClients(), options.client);
+    if (!selected) { write('Cancelled.\n'); return; }
+    write('Using ' + selected.name + (selected.pid ? ' (PID ' + selected.pid + ')' : '') + '.\n');
+    let deadline = Date.now() + 60000;
+    const listeners = getListeners();
+    let port = listeners.filter(listener => listener.pid === selected.pid).map(listener => listener.port)
+        .find(value => testPort(selected, value, deadline));
+    if (!port) {
+        port = selected.defaultPort;
+        while (listeners.some(listener => listener.port === port)) port++;
+        if (port > 65535) throw new Error('No available local debug port.');
+        startDiscord(selected, port, deadline);
     }
-    if (!page) throw new Error('No Discord window found. Open the main window and log in first.');
-    const client = connect(socketUrl(page));
+    write('Locating the Discord window...\n');
+    let pages = [];
+    while (!pages.length) {
+        const response = fetchText(debugBase(port) + '/json', Math.min(3, remainingSeconds(deadline)), true);
+        try { if (response) pages = discordPages(JSON.parse(response)); } catch (_) { /* Renderer may still be starting. */ }
+        if (pages.length) break;
+        if (!clientRunning(selected)) throw new Error('The selected Discord client exited.');
+        delay(1);
+    }
+    const remaining = remainingSeconds(deadline) * 1000;
+    const page = selectPage(pages);
+    if (!page) { write('Cancelled.\n'); return; }
+    deadline = Date.now() + remaining;
+    if (!ownsPort(selected, port)) throw new Error('The selected Discord client debug port is no longer available.');
+    const client = connect(socketUrl(page, port));
     try {
-        let ready = false;
-        for (let i = 0; i < 20; i++) {
-            if (client.evaluate('typeof webpackChunkdiscord_app', 3000) === 'object') { ready = true; break; }
+        while (true) {
+            if (client.evaluate('typeof webpackChunkdiscord_app', Math.min(3000, remainingSeconds(deadline) * 1000)) === 'object') break;
+            if (!clientRunning(selected)) throw new Error('The selected Discord client exited.');
             delay(1);
         }
-        if (!ready) throw new Error('Discord did not finish loading. Log in and try again.');
+        if (!ownsPort(selected, port)) throw new Error('The selected Discord client debug port is no longer available.');
         write('Injecting...\n');
         const value = client.evaluate(makeExpression(name, code, input));
         if (name === 'token') {

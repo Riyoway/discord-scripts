@@ -1,5 +1,6 @@
 # menu — browse, copy, and run scripts from PowerShell on Windows or macOS.
 #   irm https://script.riyo.me/p/menu | iex
+param([string]$Client)
 $ErrorActionPreference = "Stop"
 $BASE = "https://script.riyo.me"
 
@@ -92,5 +93,5 @@ if ([Console]::IsInputRedirected) {
     }
 }
 else { Clear-Host }
-if ($selected.runner) { iex (Invoke-RestMethod (Resolve-ScriptUrl $selected.runner)) }
+if ($selected.runner) { & ([scriptblock]::Create((Invoke-RestMethod (Resolve-ScriptUrl $selected.runner)))) @PSBoundParameters }
 else { Copy-Source $selected; Write-Host "Copied source for '$($selected.name)' to the clipboard." -ForegroundColor Green }

@@ -44,6 +44,17 @@ A one-line loader such as `fetch("https://script.riyo.me/d/c/autoquest")` does n
 
 Every script has a one-line runner using the shared `powershell/run.ps1` injector. It runs the script in the Discord desktop client over the Chrome DevTools Protocol — PowerShell does the fetching, so Discord's CSP does not block loading the source. Network requests made by the injected script still follow the client's CSP.
 
+All terminal runners share client selection. If several Discord clients are running, pick the intended client by number; the list shows Stable, PTB, Canary, or Development and its PID. One running client is selected automatically. With no running clients, select an installed client to launch. If the selected client has multiple Discord windows, choose the window as well. Blank input cancels without injecting.
+
+To select a client explicitly, every Windows runner accepts `-Client` with `stable`, `ptb`, `canary`, `development`, an exact client name, or a PID. For example:
+
+```powershell
+& ([scriptblock]::Create((irm https://script.riyo.me/d/p/search))) -Client canary
+& ([scriptblock]::Create((irm https://script.riyo.me/d/p/badge-gametime))) -Client 12345
+```
+
+The injector checks which process owns the debug port. It reuses the selected client's existing port or restarts only that client with a separate port. Windows relaunches preserve the selected process's profile arguments, including `--user-data-dir`. A different client already listening on port 9222 is not used as a substitute. Run `pwsh -NoProfile -File tests/powershell-clients.test.ps1` for the offline routing checks.
+
 ```powershell
 irm https://script.riyo.me/p/menu | iex             # interactive picker (category, then browse / copy / run)
 irm https://script.riyo.me/d/p/autoquest | iex      # run autoquest
@@ -69,7 +80,14 @@ curl -fsSL https://script.riyo.me/d/m/autoquest | sh
 
 Replace `autoquest` with any script name from the table. All eight scripts use the shared native injector. The menu supports running a script, copying its source, or copying its terminal command. The library includes **macOS command** copy buttons. Tokens go directly to the clipboard without being printed; `whoami` returns JSON in Terminal, and `snowflake` reads an ID from Terminal and copies its timestamp.
 
-The macOS runner finds Stable, PTB, Canary or Development in `/Applications` or `~/Applications`, reads the bundle's executable name, and selects a running installation when possible. If a debug endpoint already exists, it reuses it. Otherwise it quits only the selected app, waits for it to exit, and launches the bundle executable directly with a local debugging port. It waits up to 30 seconds for the port and distinguishes a running app without a debug port from a process that exited. If startup fails, it asks macOS to reopen Discord normally before reporting the error. Log in to Discord before running a script.
+The macOS runner finds Stable, PTB, Canary or Development in `/Applications` or `~/Applications` and offers the same numbered client and window choices. Every named runner and the menu accept `--client` with a client name, alias, or PID:
+
+```sh
+curl -fsSL https://script.riyo.me/d/m/search | sh -s -- --client canary
+curl -fsSL https://script.riyo.me/m/menu | sh -s -- --client 12345
+```
+
+It verifies port ownership using `lsof`, reuses only the selected client's endpoint, and otherwise quits and relaunches only the selected app with a separate debug port. Startup has one 60-second budget; time spent choosing a client or window is excluded. If launch fails, it asks macOS to reopen the selected app normally. Multiple instances of the same macOS app bundle, or instances with custom profile arguments, must already have their own debug ports; automatic relaunch is refused rather than switching profiles. Log in to Discord before running a script.
 
 The injector uses Apple's [URLSession WebSocket API](https://developer.apple.com/documentation/foundation/urlsessionwebsockettask). Its callbacks run on the [session's main delegate queue](https://developer.apple.com/documentation/foundation/urlsession/delegatequeue). No browser window, UI automation, or Accessibility permission is needed. Source fetching happens outside Discord's CSP.
 
@@ -79,7 +97,7 @@ Offline runner check: `powershell -File tests/powershell.test.ps1`. This checks 
 
 The PowerShell runner waits for the debug port, main window, and renderer while the selected Discord process is running, with one shared 60-second startup limit. Network and socket timeouts are capped by the remaining time. It prints a status message every 15 checks; press `Ctrl+C` to cancel. If Discord exits, the wait ends with an error. A newly launched updater gets 30 initial checks to spawn the app, within the same limit. Slow-start checks: `pwsh -NoProfile -File tests/powershell-wait.test.ps1` (also supports Windows PowerShell).
 
-The runner reuses an existing debugging endpoint when available; otherwise it quits Discord (interrupting any call), relaunches it with `--remote-debugging-port=9222`, and runs the script in the main window. The debug port stays open until Discord is restarted normally; while it is open, any local program can run code in your Discord, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`; verify with `irm http://127.0.0.1:9222/json/version` after launch.
+The runner reuses the selected client's debugging endpoint when available; otherwise it quits that client (interrupting its calls), relaunches it with a free `--remote-debugging-port`, and runs the script in the selected window. The debug port stays open until that client is restarted normally; while it is open, local programs can run code in that client, so close it when you are done. Requires a Discord build that honours `--remote-debugging-port`. Console scripts pasted directly into DevTools run in the client whose console you opened.
 
 DevTools is disabled in the desktop app by default. To enable it, add this line to `%APPDATA%\discord\settings.json` (macOS: `~/Library/Application Support/discord/settings.json`), then restart Discord:
 

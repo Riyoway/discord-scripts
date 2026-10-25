@@ -12,18 +12,18 @@ foreach ($name in 'Get-DiscordStartupTimeout', 'Test-DiscordRunning', 'Wait-Disc
 
 & {
     $macOS = $false
-    $flavor = $null
-    function Get-Process([string[]]$Name, $ErrorAction) {
-        Assert ($Name -contains 'DiscordCanary') 'Reused debug ports must detect every supported Discord flavor'
+    $selected = [pscustomobject]@{ ProcessId=123; Name='DiscordCanary' }
+    function Get-Process($Id, $ErrorAction) {
+        Assert ($Id -eq 123) 'Wait must monitor the selected process'
         [pscustomobject]@{ Id = 123 }
     }
     Assert (Test-DiscordRunning) 'A running Discord flavor must be detected'
 }
 & {
     $macOS = $false
-    $flavor = 'DiscordPTB'
-    function Get-Process([string[]]$Name, $ErrorAction) {
-        Assert (@($Name).Count -eq 1 -and $Name[0] -eq 'DiscordPTB') 'A launched runner must monitor its selected flavor'
+    $selected = [pscustomobject]@{ ProcessId=456; Name='DiscordPTB' }
+    function Get-Process($Id, $ErrorAction) {
+        Assert ($Id -eq 456) 'Another running client must not hide the selected client exiting'
     }
     Assert (-not (Test-DiscordRunning)) 'Other Discord flavors must not hide the selected app exiting'
 }
