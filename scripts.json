@@ -7,5 +7,5 @@
   { "category": "Discord", "name": "export", "desc": "Save the open DM/channel as a Discord-looking HTML file.", "source": "/d/c/export", "runner": "/d/p/export" },
   { "category": "Discord", "name": "snowflake", "desc": "Decode a Discord ID or message link into its creation time.", "source": "/d/c/snowflake", "runner": "/d/p/snowflake" },
   { "category": "Discord", "name": "search", "desc": "Search channel messages with keywords or RegExp, then export TXT or JSON.", "source": "/d/c/search", "runner": "/d/p/search" },
-  { "category": "Discord", "name": "badge-gametime", "displayName": "Discord Game Time & Game Variety Badge", "desc": "Plan game-time allocations and simulate them locally without changing account activity.", "source": "/d/c/badge-gametime", "runner": "/d/p/badge-gametime" }
+  { "category": "Discord", "name": "badge-gametime", "displayName": "Discord Game Time & Game Variety Badge", "desc": "Rotate Discord desktop game activity every 23–38 minutes, with Stop and automatic restoration.", "source": "/d/c/badge-gametime", "runner": "/d/p/badge-gametime" }
 ]

@@ -12,7 +12,7 @@ Scripts for Discord, served from the [script library](https://script.riyo.me/lib
 | [`export`](console/export.js) | Saves the open DM/channel as a self-contained, Discord-looking HTML file |
 | [`snowflake`](console/snowflake.js) | Decodes an ID or message link into its creation time and a Discord timestamp |
 | [`search`](console/search.js) | Searches current-channel messages with keywords or RegExp; exports TXT/JSON |
-| [`Discord Game Time & Game Variety Badge`](console/badge-gametime.js) (`badge-gametime`) | Plans game-time allocations and simulates them locally; does not change account activity |
+| [`Discord Game Time & Game Variety Badge`](console/badge-gametime.js) (`badge-gametime`) | Rotates desktop game activity every 23–38 minutes; restores game detection on Stop |
 
 `snowflake` uses the timestamp bits and epoch documented in [Discord's Snowflake reference](https://docs.discord.com/developers/reference#snowflakes).
 
@@ -133,9 +133,11 @@ Set **Channel** to a channel ID, channel/message link, or `<#channel ID>` mentio
 
 ## Discord Game Time & Game Variety Badge (`badge-gametime`)
 
-Loads Discord's public game catalog and distributes a chosen total number of hours across randomly selected Windows-compatible games. Set the game count, batch size, delay, and optional time wobble, then press **Start**. Progress and allocations appear in the panel and console. **Stop**, closing the panel, or rerunning the script stops the simulation.
+Loads Discord's public detectable-game catalog, then uses the desktop client's `RunningGameStore` and activity dispatcher to show one selected game at a time. **Start** activates the first game and keeps running, switching every 23–38 minutes. The candidate pool defaults to 250 games; the last 100 selections are excluded where the pool size permits. Existing real games remain in the game store.
 
-This is a local planner and dry-run simulator. It does not submit playtime, change activity, or update your account. Run the offline checks with `node --test tests/badge-gametime.test.cjs`.
+**Session limit (hours)** defaults to 1,000 and caps actual session runtime. It does not instantly add those hours to a badge. The optional ±3% timing wobble defaults to enabled and stays within the 23–38 minute range. The panel shows the active game, next switch time, and different games shown. The former dry-run batch/delay controls are replaced by the rotation schedule.
+
+**Stop**, closing the panel, rerunning the script, or leaving the page cancels the timer and restores the patched methods. Advanced console controls remain available as `window.__multiGamePresence.next()` and `.stop()`. Badge progress is controlled by Discord and is not confirmed by a successful local activity dispatch. Run the offline checks with `node --test tests/badge-gametime.test.cjs`; they use a fake store and clock and do not access an account.
 
 ## token
 

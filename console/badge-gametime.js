@@ -1,4 +1,4 @@
-// badge-gametime — Discord Game Time & Game Variety Badge planner / dry-run simulator.
+// badge-gametime — rotating Discord desktop game presence.
 (async () => {
     // BEGIN SHARED UI
     // Embedded by scripts/sync-ui.cjs so every console script works without remote UI assets.
@@ -108,16 +108,15 @@
         const DEFAULTS = Object.freeze({
             totalHours: 1000,
             titles: 250,
-            batchSize: 25,
-            delayMs: 450,
             wobble: true
         });
+        const LOCK = "__multiGamePresence";
+        const MIN_CHANGE_MS = 23 * 60 * 1000;
+        const MAX_CHANGE_MS = 38 * 60 * 1000;
+        const RECENT_HISTORY_SIZE = 100;
 
         const GAMES_URL =
             "https://cdn.discordapp.com/detectables/games.json";
-
-        const sleep = ms =>
-            new Promise(resolve => setTimeout(resolve, ms));
 
         const shuffle = input => {
             const a = [...input];
@@ -146,45 +145,143 @@
             game?.display_name ||
             `Game ${game?.id ?? "unknown"}`;
 
-        const windowsExecutables = game => {
-            const executables = game?.executables;
-            if (!Array.isArray(executables)) return [];
-
-            return executables.filter(entry => {
-                const os = String(
-                    entry?.os ||
-                    entry?.platform ||
-                    entry?.operating_system ||
-                    ""
-                ).toLowerCase();
-
-                return (
-                    os === "win32" ||
-                    os === "windows" ||
-                    os === "win"
-                );
-            });
+        const platform = /Linux/i.test(navigator.userAgent) ? "linux" : "win32";
+        const executableFor = game => {
+            const executables = Array.isArray(game?.executables) ? game.executables : [];
+            return executables.find(exe => exe?.os === platform && exe.name)
+                || executables.find(exe => exe?.os === "win32" && exe.name);
         };
 
-        const buildDurations = (count, totalHours, wobble) => {
-            if (count <= 0) return [];
-
-            if (!wobble) {
-                const each = totalHours / count;
-                return Array.from({ length: count }, () => each);
+        function createPresence(games, config, onChange, onStop, onError) {
+            if (window[LOCK]?.stop) throw new Error("Another game presence session is running. Stop it with window.__multiGamePresence.stop().");
+            let req = window.Vencord?.Webpack?.wreq;
+            if (!req?.c && typeof webpackChunkdiscord_app !== "undefined") {
+                webpackChunkdiscord_app.push([[Symbol("badge-gametime")], {}, incoming => {
+                    if (Object.keys(incoming?.c || {}).length > Object.keys(req?.c || {}).length) req = incoming;
+                }]);
+                webpackChunkdiscord_app.pop();
             }
-
-            const weights = Array.from(
-                { length: count },
-                () => 0.97 + Math.random() * 0.06
-            );
-
-            const totalWeight = weights.reduce((a, b) => a + b, 0);
-
-            return weights.map(
-                weight => totalHours * (weight / totalWeight)
-            );
-        };
+            if (!req?.c) throw new Error("Discord webpack registry not found. Use the Discord desktop app.");
+            const exports = Object.values(req.c).flatMap(module => {
+                try {
+                    const value = module?.exports;
+                    return value ? [value, value.default, ...(typeof value === "object" ? Object.values(value) : [])] : [];
+                } catch { return []; }
+            }).filter(Boolean);
+            const store = exports.find(value => {
+                try {
+                    return value.getName?.() === "RunningGameStore"
+                        || Object.getPrototypeOf(value)?.constructor?.displayName === "RunningGameStore";
+                } catch { return false; }
+            });
+            const dispatcher = exports.find(value => typeof value.dispatch === "function" && typeof value.subscribe === "function" && value._subscriptions);
+            if (!store || !dispatcher || typeof store.getRunningGames !== "function" || typeof store.getGameForPID !== "function") {
+                throw new Error("Discord desktop RunningGameStore/Dispatcher not found.");
+            }
+            const keys = ["getRunningGames", "getGameForPID", "getVisibleGame", "getVisibleRunningGames", "getCandidateGames"];
+            const originals = new Map(keys.filter(key => typeof store[key] === "function").map(key => [key, {
+                fn: store[key], descriptor: Object.getOwnPropertyDescriptor(store, key)
+            }]));
+            const patches = new Map();
+            let pid = 45000 + Math.floor(Math.random() * 10000);
+            const usedPids = new Set((store.getRunningGames() || []).map(game => game?.pid));
+            while (usedPids.has(pid)) pid++;
+            const realGames = () => (originals.get("getRunningGames").fn.call(store) || []).filter(game => game?.pid !== pid);
+            const history = [];
+            const shown = new Set();
+            const deadline = Date.now() + config.totalHours * 3600000;
+            let current = null, index = -1, timer = null, active = true, controller;
+            const patch = (key, fn) => {
+                patches.set(key, fn);
+                store[key] = fn;
+                if (store[key] !== fn) throw new Error(`Could not patch RunningGameStore.${key}.`);
+            };
+            const remove = game => {
+                if (!game) return;
+                dispatcher.dispatch({ type: "RUNNING_GAMES_CHANGE", added: [], removed: [game], games: realGames() });
+                dispatcher.dispatch({ type: "LOCAL_ACTIVITY_UPDATE", socketId: null, pid, activity: null });
+            };
+            const stop = (message = "Stopped.") => {
+                if (!active) return;
+                active = false;
+                clearTimeout(timer);
+                const previous = current;
+                current = null;
+                for (const [key, fn] of patches) {
+                    if (store[key] !== fn) continue;
+                    const { descriptor } = originals.get(key);
+                    if (descriptor) Object.defineProperty(store, key, descriptor);
+                    else delete store[key];
+                }
+                try { remove(previous); }
+                catch (error) { console.error("[badge-gametime] Cleanup notification failed:", error); }
+                finally {
+                    if (window[LOCK] === controller) delete window[LOCK];
+                    onStop(message);
+                }
+            };
+            const next = () => {
+                if (!active) return;
+                clearTimeout(timer);
+                if (Date.now() >= deadline) { stop("Session finished: time limit reached."); return; }
+                try {
+                    const blocked = new Set(history);
+                    blocked.add(index);
+                    let candidates = games.map((_, i) => i).filter(i => !blocked.has(i));
+                    if (!candidates.length) {
+                        history.length = 0;
+                        candidates = games.map((_, i) => i).filter(i => i !== index);
+                    }
+                    index = candidates.length ? candidates[Math.floor(Math.random() * candidates.length)] : 0;
+                    history.push(index);
+                    while (history.length > Math.min(RECENT_HISTORY_SIZE, Math.max(0, games.length - 1))) history.shift();
+                    const previous = current;
+                    current = null;
+                    remove(previous);
+                    const game = games[index];
+                    const slug = getName(game).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || String(game.id);
+                    const executable = executableFor(game).name.replaceAll("\\", "/").split("/").pop();
+                    current = {
+                        id: String(game.id), name: getName(game), pid, pidPath: [pid], processName: executable,
+                        start: Date.now(), exeName: executable, exePath: `/synthetic/games/${slug}/${executable}`,
+                        cmdLine: `/synthetic/games/${slug}/${executable}`, executables: [{ os: platform, name: executable, is_launcher: false }],
+                        windowHandle: 0, fullscreenType: 0, overlay: false, sandboxed: false, hidden: false, isLauncher: false
+                    };
+                    dispatcher.dispatch({ type: "RUNNING_GAMES_CHANGE", added: [current], removed: [], games: store.getRunningGames() });
+                    dispatcher.dispatch({ type: "LOCAL_ACTIVITY_UPDATE", socketId: null, pid, activity: {
+                        name: current.name, type: 0, details: null, state: null, timestamps: { start: current.start }, assets: null
+                    } });
+                    shown.add(current.id);
+                    let delay = MIN_CHANGE_MS + Math.floor(Math.random() * (MAX_CHANGE_MS - MIN_CHANGE_MS + 1));
+                    if (config.wobble) delay *= 0.97 + Math.random() * 0.06;
+                    delay = Math.min(deadline - Date.now(), Math.min(MAX_CHANGE_MS, Math.max(MIN_CHANGE_MS, Math.round(delay))));
+                    onChange(current, shown.size, Date.now() + delay);
+                    console.log("[badge-gametime] Active:", current.name, "Next change in", (delay / 60000).toFixed(1), "min");
+                    timer = setTimeout(next, delay);
+                } catch (error) {
+                    stop("Stopped after an activity error.");
+                    onError(error);
+                }
+            };
+            controller = { stop, next, games, history, get current() { return current?.name ?? null; }, get index() { return index; }, get totalGames() { return games.length; } };
+            try {
+                patch("getRunningGames", () => current ? [...realGames(), current] : realGames());
+                patch("getGameForPID", value => value === pid && current ? current : originals.get("getGameForPID").fn.call(store, value));
+                if (originals.has("getVisibleGame")) patch("getVisibleGame", () => current || originals.get("getVisibleGame").fn.call(store));
+                for (const key of ["getVisibleRunningGames", "getCandidateGames"]) {
+                    if (originals.has(key)) patch(key, () => {
+                        const real = (originals.get(key).fn.call(store) || []).filter(game => game?.pid !== pid);
+                        return current ? [...real, current] : real;
+                    });
+                }
+                window[LOCK] = controller;
+                next();
+                return active ? controller : null;
+            } catch (error) {
+                stop("Could not start game presence.");
+                throw error;
+            }
+        }
 
         const panel = document.createElement("div");
         panel.id = OLD_ID;
@@ -210,7 +307,7 @@
             </header>
 
             <label class="riyo-label">
-                Total hours
+                Session limit (hours)
                 <input
                     id="gt-hours"
                     type="number"
@@ -222,7 +319,7 @@
             </label>
 
             <label class="riyo-label">
-                Games
+                Game pool size
                 <input
                     id="gt-games"
                     type="number"
@@ -230,30 +327,6 @@
                     max="20000"
                     step="1"
                     value="${DEFAULTS.titles}"
-                >
-            </label>
-
-            <label class="riyo-label">
-                Batch size
-                <input
-                    id="gt-batch"
-                    type="number"
-                    min="1"
-                    max="500"
-                    step="1"
-                    value="${DEFAULTS.batchSize}"
-                >
-            </label>
-
-            <label class="riyo-label">
-                Delay between games (ms)
-                <input
-                    id="gt-delay"
-                    type="number"
-                    min="0"
-                    max="60000"
-                    step="50"
-                    value="${DEFAULTS.delayMs}"
                 >
             </label>
 
@@ -272,14 +345,12 @@
                 id="gt-summary"
                 class="riyo-status"
             >
-                ${(
-                    DEFAULTS.totalHours /
-                    DEFAULTS.titles
-                ).toFixed(2)} h/game
+                Switches every 23–38 minutes.
             </div>
 
             <progress
                 id="gt-progress"
+                aria-label="Different games shown during this session"
                 value="0"
                 max="1"
             ></progress>
@@ -320,8 +391,6 @@
 
         const hoursInput = $("#gt-hours");
         const gamesInput = $("#gt-games");
-        const batchInput = $("#gt-batch");
-        const delayInput = $("#gt-delay");
         const wobbleInput = $("#gt-wobble");
 
         const summary = $("#gt-summary");
@@ -332,8 +401,10 @@
         const stopButton = $("#gt-stop");
         const closeButton = $("#gt-close");
 
-        let stopped = false;
         let running = false;
+        let generation = 0;
+        let loading = null;
+        let presence = null;
 
         const readConfig = () => ({
             totalHours: clampNumber(
@@ -350,20 +421,6 @@
                 DEFAULTS.titles
             ),
 
-            batchSize: clampInt(
-                batchInput.value,
-                1,
-                500,
-                DEFAULTS.batchSize
-            ),
-
-            delayMs: clampInt(
-                delayInput.value,
-                0,
-                60000,
-                DEFAULTS.delayMs
-            ),
-
             wobble: wobbleInput.checked
         });
 
@@ -371,16 +428,14 @@
             const config = readConfig();
 
             summary.textContent =
-                `${(config.totalHours / config.titles).toFixed(2)} h/game ` +
-                `• ${config.titles.toLocaleString()} games ` +
-                `• ${config.totalHours.toLocaleString()} total hours`;
+                `${config.titles.toLocaleString()} game pool ` +
+                `• ${config.totalHours.toLocaleString()} h session limit ` +
+                `• 23–38 min per game`;
         };
 
         [
             hoursInput,
             gamesInput,
-            batchInput,
-            delayInput,
             wobbleInput
         ].forEach(node =>
             node.addEventListener("input", updateSummary)
@@ -394,23 +449,28 @@
 
             hoursInput.disabled = value;
             gamesInput.disabled = value;
-            batchInput.disabled = value;
-            delayInput.disabled = value;
             wobbleInput.disabled = value;
         };
 
         const stop = () => {
-            stopped = true;
-
-            if (running) {
-                status.textContent = "Stopping…";
-            }
+            generation++;
+            loading?.abort();
+            loading = null;
+            const session = presence;
+            presence = null;
+            session?.stop();
+            setRunning(false);
+            status.textContent = "Stopped.";
         };
 
-        panel.__stop = stop;
+        window.addEventListener("pagehide", stop);
+        panel.__stop = () => {
+            stop();
+            window.removeEventListener("pagehide", stop);
+        };
 
         closeButton.addEventListener("click", () => {
-            stop();
+            panel.__stop();
             panel.remove();
         });
 
@@ -419,7 +479,9 @@
         startButton.addEventListener("click", async () => {
             if (running) return;
 
-            stopped = false;
+            const id = ++generation;
+            const controller = new AbortController();
+            loading = controller;
             setRunning(true);
 
             progress.value = 0;
@@ -432,7 +494,8 @@
                     "Loading Discord game catalog…";
 
                 const response = await fetch(GAMES_URL, {
-                    cache: "no-store"
+                    cache: "no-store",
+                    signal: controller.signal
                 });
 
                 if (!response.ok) {
@@ -442,6 +505,7 @@
                 }
 
                 const raw = await response.json();
+                if (id !== generation) return;
 
                 const games = Array.isArray(raw)
                     ? raw
@@ -449,13 +513,16 @@
                     ? raw.games
                     : [];
 
-                const compatible = games.filter(
-                    game => windowsExecutables(game).length > 0
-                );
+                const seen = new Set();
+                const compatible = games.filter(game => {
+                    if (!game?.id || !executableFor(game) || seen.has(String(game.id))) return false;
+                    seen.add(String(game.id));
+                    return true;
+                });
 
                 if (!compatible.length) {
                     throw new Error(
-                        "No Windows-compatible games were found."
+                        "No usable detectable games were found."
                     );
                 }
 
@@ -466,75 +533,34 @@
 
                 const selected = shuffle(compatible).slice(0, count);
 
-                const durations = buildDurations(
-                    selected.length,
-                    config.totalHours,
-                    config.wobble
-                );
-
                 progress.max = selected.length;
 
                 summary.textContent =
-                    `${compatible.length.toLocaleString()} Windows games available ` +
-                    `• using ${selected.length.toLocaleString()} ` +
-                    `• ${(config.totalHours / selected.length).toFixed(2)} h/game avg`;
-
-                for (
-                    let batchStart = 0;
-                    batchStart < selected.length;
-                    batchStart += config.batchSize
-                ) {
-                    if (stopped) break;
-
-                    const batch = selected.slice(
-                        batchStart,
-                        batchStart + config.batchSize
-                    );
-
-                    for (let i = 0; i < batch.length; i++) {
-                        if (stopped) break;
-
-                        const absoluteIndex = batchStart + i;
-                        const game = batch[i];
-                        const hours = durations[absoluteIndex];
-
-                        status.textContent =
-                            `${absoluteIndex + 1}/${selected.length} ` +
-                            `${getName(game)} ` +
-                            `• ${hours.toFixed(2)} h`;
-
-                        progress.value = absoluteIndex + 1;
-
-                        console.log("[badge-gametime dry-run]", {
-                            index: absoluteIndex + 1,
-                            game: getName(game),
-                            gameId: game?.id,
-                            hours,
-                            executables: windowsExecutables(game)
-                        });
-
-                        if (config.delayMs > 0) {
-                            await sleep(config.delayMs);
-                        }
-                    }
-                }
-
-                if (stopped) {
-                    status.textContent =
-                        `Stopped at ${progress.value}/${selected.length}.`;
-                } else {
-                    status.textContent =
-                        `Finished dry run: ${selected.length} games, ` +
-                        `${config.totalHours.toLocaleString()} total hours.`;
-                }
+                    `${selected.length.toLocaleString()} game pool ` +
+                    `• ${config.totalHours.toLocaleString()} h session limit ` +
+                    `• 23–38 min per game`;
+                presence = createPresence(selected, config, (game, shown, nextAt) => {
+                    progress.value = shown;
+                    status.textContent = `Active: ${game.name} • ${shown}/${selected.length} games shown • next change ${new Date(nextAt).toLocaleTimeString()}`;
+                }, message => {
+                    if (id !== generation) return;
+                    presence = null;
+                    status.textContent = message;
+                    setRunning(false);
+                }, error => {
+                    console.error("[badge-gametime]", error);
+                    if (id === generation) status.textContent = error?.message || String(error);
+                });
             } catch (error) {
-                console.error("[badge-gametime]", error);
-
-                status.textContent =
-                    error?.message ||
-                    String(error);
+                if (id === generation) {
+                    console.error("[badge-gametime]", error);
+                    status.textContent = error?.message || String(error);
+                }
             } finally {
-                setRunning(false);
+                if (id === generation) {
+                    loading = null;
+                    if (!presence) setRunning(false);
+                }
             }
         });
 
