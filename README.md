@@ -12,6 +12,7 @@ Scripts for Discord, served from the [script library](https://script.riyo.me/lib
 | [`export`](console/export.js) | Saves the open DM/channel as a self-contained, Discord-looking HTML file |
 | [`snowflake`](console/snowflake.js) | Decodes an ID or message link into its creation time and a Discord timestamp |
 | [`search`](console/search.js) | Searches current-channel messages with keywords or RegExp; exports TXT/JSON |
+| [`gametime`](console/gametime.js) | Plans game-time allocations and simulates them locally; does not change account activity |
 
 `snowflake` uses the timestamp bits and epoch documented in [Discord's Snowflake reference](https://docs.discord.com/developers/reference#snowflakes).
 
@@ -127,6 +128,12 @@ Archive entries retain filenames from response headers or URLs, with a numeric p
 Set **Channel** to a channel ID, channel/message link, or `<#channel ID>` mention, then press **Find**. Leave it blank to use the current channel. The target does not need to be open. Literal keyword matching ignores case; **RegExp** uses a case-sensitive regular expression. **All messages** scans history in pages of 100. Disable it to fetch the latest 1–100 messages, or set **Limit** to 0 to search that channel's local cache (which may be empty if it has never been opened). The target channel is fixed for each run.
 
 **Cancel**, closing the panel, and rerunning the script stop further requests and remove drag listeners. Rate limits respect the retry delay, with at most three retries. The panel displays up to 200 matches; exports include all matches scanned before completion or cancellation. **TXT** exports unique URLs, falling back to message text when none exist. **JSON** exports message IDs, timestamps, authors, and content. Searches only read channels accessible to your account.
+
+## gametime
+
+Loads Discord's public game catalog and distributes a chosen total number of hours across randomly selected Windows-compatible games. Set the game count, batch size, delay, and optional time wobble, then press **Start**. Progress and allocations appear in the panel and console. **Stop**, closing the panel, or rerunning the script stops the simulation.
+
+This is a local planner and dry-run simulator. It does not submit playtime, change activity, or update your account. Run the offline checks with `node --test tests/gametime.test.cjs`.
 
 ## token
 

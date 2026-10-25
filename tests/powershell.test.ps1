@@ -39,7 +39,7 @@ $runnerAst = [Management.Automation.Language.Parser]::ParseInput($shared, [ref]$
     $script:answers.Enqueue('No')
     & ([scriptblock]::Create($shared)) -Name 'search'
 }
-$macBranch = $runnerAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text -eq '$macOS' }, $true).Clauses[0].Item2.Extent.Text
+$macBranch = $runnerAst.Find({ param($node) $node -is [Management.Automation.Language.IfStatementAst] -and $node.Clauses[0].Item1.Extent.Text -eq '$macOS' -and $node.Clauses[0].Item2.Extent.Text.Contains('function Get-MacDiscordPids') }, $true).Clauses[0].Item2.Extent.Text
 & {
     $port = 9222
     $script:quit = $false
@@ -95,6 +95,7 @@ assert.equal(tables[0].username,'Offline user');assert.equal(tables[0].servers,1
             Assert ($LASTEXITCODE -eq 0) 'Snowflake runner did not return its timestamp'
         }
     }
-    Assert ($manifest.Count -eq 8) 'Expected all eight Discord scripts'
+    $allowedNames = $runnerAst.ParamBlock.Parameters[0].Attributes | Where-Object { $_.TypeName.Name -eq 'ValidateSet' } | ForEach-Object { $_.PositionalArguments.Value }
+    Assert ((($allowedNames | Sort-Object) -join ',') -eq (($manifest.name | Sort-Object) -join ',')) 'Runner must accept exactly the scripts in the manifest'
     Write-Host 'PASS: runner registration, PowerShell/JavaScript syntax, whoami tables, and terminal snowflake input/output.'
 } finally { if (Test-Path -LiteralPath $tempJs) { Remove-Item -LiteralPath $tempJs } }
