@@ -103,7 +103,7 @@ function Get-DiscordClients {
         $variant = $variants[$i]
         $running = @($processes | Where-Object { $_.Name -eq "$variant.exe" })
         foreach ($process in $running) {
-            [pscustomobject]@{ Name=$variant; Key=$keys[$i]; ProcessId=[int]$process.ProcessId; Executable=$process.ExecutablePath; CommandLine=$process.CommandLine; DefaultPort=9222+$i }
+            [pscustomobject]@{ Name=$variant; Key=$keys[$i]; ProcessId=[int]$process.ProcessId; Created=$process.CreationDate; Executable=$process.ExecutablePath; CommandLine=$process.CommandLine; DefaultPort=9222+$i }
         }
         $updater = Join-Path $env:LOCALAPPDATA "$variant/Update.exe"
         if (-not $running.Count -and (Test-Path -LiteralPath $updater)) {
@@ -113,8 +113,13 @@ function Get-DiscordClients {
 }
 function Get-DiscordListeners {
     if (-not $macOS) {
-        Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $_.LocalAddress -in @('127.0.0.1','0.0.0.0') } | ForEach-Object {
-            [pscustomobject]@{ ProcessId=[int]$_.OwningProcess; Port=[int]$_.LocalPort }
+        # CIM port queries can take seconds per poll; numeric netstat output also works without that module.
+        $rows = @(& "$env:SystemRoot\System32\netstat.exe" -ano)
+        if ($LASTEXITCODE -ne 0) { throw 'Could not inspect local Discord ports.' }
+        foreach ($row in $rows) {
+            if ($row -match '^\s*TCP\s+(\S+):(\d+)\s+(?:0\.0\.0\.0|\[::\]):0\s+\S+\s+(\d+)\s*$') {
+                [pscustomobject]@{ Address=$Matches[1]; Port=[int]$Matches[2]; ProcessId=[int]$Matches[3] }
+            }
         }
         return
     }
@@ -122,33 +127,67 @@ function Get-DiscordListeners {
     $owner = 0
     foreach ($line in @(& /usr/sbin/lsof -nP -iTCP -sTCP:LISTEN -Fpn)) {
         if ($line -match '^p(\d+)$') { $owner = [int]$Matches[1] }
-        elseif ($line -match '^n(?:127\.0\.0\.1|0\.0\.0\.0|\*):(\d+)$') {
-            [pscustomobject]@{ ProcessId=$owner; Port=[int]$Matches[1] }
+        elseif ($line -match '^n(127\.0\.0\.1|0\.0\.0\.0|\*|\[::1\]|\[::\]):(\d+)$') {
+            [pscustomobject]@{ ProcessId=$owner; Address=$Matches[1]; Port=[int]$Matches[2] }
         }
     }
     if ($LASTEXITCODE -gt 1) { throw 'Could not inspect local Discord ports.' }
 }
 function Get-DiscordStartupTimeout($MaximumMilliseconds) {
     $remainingSeconds = [Math]::Floor((60000 - $startupWait.Elapsed.TotalMilliseconds) / 1000)
-    if ($remainingSeconds -lt 1) { throw 'Discord startup timed out (60-second limit). Open Discord, wait for it to load, and try again.' }
+    if ($remainingSeconds -lt 1) { throw "Discord startup timed out (60-second limit). Client: $($selected.Name), PID: $($selected.ProcessId), debug port: $port. Open that client, wait for it to load, and try again." }
     [int][Math]::Min($MaximumMilliseconds, $remainingSeconds * 1000)
 }
+function Get-DiscordLoopback($Address) {
+    if ($Address -in @('[::1]','[::]')) { return '[::1]' }
+    if (-not $Address -or $Address -in @('127.0.0.1','0.0.0.0','*')) { return '127.0.0.1' }
+}
+function Get-DiscordDebugJson($DebugHost, $DebugPort, $Path, $TimeoutMilliseconds) {
+    if ($DebugHost -notin @('127.0.0.1','[::1]') -or $DebugPort -lt 1 -or $DebugPort -gt 65535 -or $Path -notin @('/json/version','/json')) { throw 'Invalid local Discord debug endpoint.' }
+    if (-not ('Net.Http.HttpClient' -as [type])) { Add-Type -AssemblyName System.Net.Http }
+    $handler = New-Object Net.Http.HttpClientHandler
+    $handler.UseProxy = $false
+    $handler.AllowAutoRedirect = $false
+    $http = [Net.Http.HttpClient]::new($handler)
+    $http.Timeout = [TimeSpan]::FromMilliseconds($TimeoutMilliseconds)
+    try {
+        # GetAsync buffers the entire JSON body within the same timeout.
+        $response = $http.GetAsync("http://${DebugHost}:$DebugPort$Path").GetAwaiter().GetResult()
+        try {
+            if ([int]$response.StatusCode -ne 200) { throw 'Unexpected Discord debug response.' }
+            $response.Content.ReadAsStringAsync().GetAwaiter().GetResult() | ConvertFrom-Json
+        } finally { $response.Dispose() }
+    } finally { $http.Dispose() }
+}
 function Test-Port {
-    $owners = @(Get-DiscordListeners | Where-Object { $_.Port -eq $port })
-    if (-not $selected.ProcessId -and $owners.Count) {
+    $owners = @(Get-DiscordListeners | Where-Object { $_.Port -eq $port -and (Get-DiscordLoopback $_.Address) })
+    if ($selected.ProcessId -notin $owners.ProcessId -and $owners.Count -and ($selected.LaunchedAt -or ($macOS -and -not $selected.ProcessId))) {
         $started = @(Get-DiscordClients | Where-Object {
             if ($_.Name -ne $selected.Name -or $_.ProcessId -notin $owners.ProcessId) { return $false }
             if ($macOS) { return $_.Bundle -eq $selected.Bundle }
-            if ($selected.Updater) { return $_.Executable -and $_.Executable.StartsWith((Split-Path $selected.Executable -Parent) + '\', [StringComparison]::OrdinalIgnoreCase) }
+            if ($_.ProcessId -in $selected.PreviousProcessIds -or -not $_.Created -or $_.Created.ToUniversalTime() -lt $selected.LaunchedAt) { return $false }
+            if ((Get-DiscordProfileKey $_.CommandLine) -ne (Get-DiscordProfileKey $selected.CommandLine)) { return $false }
+            $directory = Split-Path $selected.Executable -Parent
+            $versioned = (Split-Path $directory -Leaf) -match '^app-\d'
+            if ($versioned) { $directory = Split-Path $directory -Parent }
+            if ($selected.Updater -or $versioned) { return $_.Executable -and $_.Executable.StartsWith($directory + '\', [StringComparison]::OrdinalIgnoreCase) }
             $_.Executable -eq $selected.Executable
         })
         if ($started.Count -eq 1) { $selected.ProcessId = $started[0].ProcessId }
     }
     if (-not $selected.ProcessId -or $selected.ProcessId -notin $owners.ProcessId) { return $false }
-    try {
-        $version = Invoke-RestMethod "http://127.0.0.1:$port/json/version" -TimeoutSec ((Get-DiscordStartupTimeout 2000) / 1000)
-        return [bool]($version.Browser -and $version.'Protocol-Version')
-    } catch { return $false }
+    foreach ($owner in @($owners | Where-Object ProcessId -eq $selected.ProcessId)) {
+        $debugHost = Get-DiscordLoopback $owner.Address
+        try {
+            $version = Get-DiscordDebugJson $debugHost $port '/json/version' (Get-DiscordStartupTimeout 2000)
+            if ($version.Browser -and $version.'Protocol-Version') {
+                $selected | Add-Member -NotePropertyName DebugHost -NotePropertyValue $debugHost -Force
+                $selected | Add-Member -NotePropertyName DebugPort -NotePropertyValue $port -Force
+                return $true
+            }
+        } catch { }
+    }
+    return $false
 }
 function Test-DiscordRunning {
     if (-not $selected.ProcessId) { return [bool]@(Get-DiscordClients | Where-Object { $_.Name -eq $selected.Name -and $_.ProcessId }).Count }
@@ -166,7 +205,7 @@ function Wait-Discord($Probe, $Message, $StartupAttempts = 0) {
         Start-Sleep -Seconds 1
     }
 }
-function Get-DiscordLaunchArguments($CommandLine, $DebugPort) {
+function Initialize-DiscordCommandLine {
     if (-not ('RiyoScriptCommandLine' -as [type])) {
         Add-Type @'
 using System;
@@ -186,6 +225,25 @@ public static class RiyoScriptCommandLine {
 }
 '@
     }
+}
+function Get-DiscordProfileKey($CommandLine) {
+    Initialize-DiscordCommandLine
+    $profile = [ordered]@{'--user-data-dir'=''; '--profile-directory'=''}
+    if ($CommandLine) {
+        $values = @([RiyoScriptCommandLine]::Split($CommandLine))
+        for ($i=1; $i -lt $values.Count; $i++) {
+            if ($values[$i] -match '^(--user-data-dir|--profile-directory)=(.*)$') { $profile[$Matches[1]]=$Matches[2] }
+            elseif ($profile.Contains($values[$i]) -and $i+1 -lt $values.Count) { $key=$values[$i]; $i++; $profile[$key]=$values[$i] }
+        }
+    }
+    ConvertTo-Json -InputObject $profile -Compress
+}
+function Get-DiscordDebugPort($CommandLine) {
+    $number = 0
+    if ($CommandLine -match '(?:^|\s)"?--remote-debugging-port(?:=|"?\s+"?)(\d+)"?(?=\s|$)' -and [int]::TryParse($Matches[1],[ref]$number) -and $number -le 65535) { return $number }
+}
+function Get-DiscordLaunchArguments($CommandLine, $DebugPort) {
+    Initialize-DiscordCommandLine
     $values = @([RiyoScriptCommandLine]::Split($CommandLine))
     $kept = @()
     for ($i = 1; $i -lt $values.Count; $i++) {
@@ -229,12 +287,20 @@ function Start-DiscordClient($Target, $DebugPort) {
         return
     }
     if ($Target.Updater) {
+        $Target | Add-Member -NotePropertyName PreviousProcessIds -NotePropertyValue @(Get-DiscordClients | Select-Object -ExpandProperty ProcessId) -Force
+        $Target | Add-Member -NotePropertyName LaunchedAt -NotePropertyValue ([DateTime]::UtcNow) -Force
         $null = Start-DiscordProcess $Target.Executable "--processStart $($Target.Name).exe --process-start-args `"--remote-debugging-port=$DebugPort`"" -Hidden
         return
     }
     if (-not $Target.Executable -or -not $Target.CommandLine) { throw 'Cannot read the selected client executable or arguments. Use a terminal with the same privileges as Discord.' }
     $arguments = Get-DiscordLaunchArguments $Target.CommandLine $DebugPort
-    Stop-Process -Id $Target.ProcessId -Force -ErrorAction Stop
+    $Target | Add-Member -NotePropertyName PreviousProcessIds -NotePropertyValue @(Get-DiscordClients | Select-Object -ExpandProperty ProcessId) -Force
+    $Target | Add-Member -NotePropertyName LaunchedAt -NotePropertyValue ([DateTime]::UtcNow) -Force
+    $previous = Get-Process -Id $Target.ProcessId -ErrorAction Stop
+    try {
+        Stop-Process -Id $Target.ProcessId -Force -ErrorAction Stop
+        if (-not $previous.WaitForExit((Get-DiscordStartupTimeout 5000))) { throw 'The selected Discord process did not quit. Close that client and try again.' }
+    } finally { $previous.Dispose() }
     $Target.ProcessId = Start-DiscordProcess $Target.Executable $arguments
 }
 function Select-DiscordPage($Pages) {
@@ -250,10 +316,11 @@ function Select-DiscordPage($Pages) {
         Write-Host 'Choose one of the listed numbers.'
     }
 }
-function Get-DiscordSocketUrl($Page, $DebugPort) {
-    $expected = '^ws://127\.0\.0\.1:' + $DebugPort + '/devtools/page/[a-z0-9-]+$'
+function Get-DiscordSocketUrl($Page, $DebugPort, $DebugHost = '127.0.0.1') {
+    $expected = '^ws://(?:127\.0\.0\.1|localhost|\[::1\]):' + $DebugPort + '(/devtools/page/[a-z0-9-]+)$'
     if ($Page.webSocketDebuggerUrl -notmatch $expected) { throw 'Unexpected Discord debug socket URL.' }
-    $Page.webSocketDebuggerUrl
+    if ($DebugHost -notin @('127.0.0.1','[::1]')) { throw 'Unexpected Discord debug host.' }
+    "ws://${DebugHost}:$DebugPort$($Matches[1])"
 }
 
 $selected = Select-DiscordClient @(Get-DiscordClients) $Client
@@ -268,26 +335,38 @@ foreach ($candidatePort in @($listeners | Where-Object { $_.ProcessId -eq $selec
     if (Test-Port) { $found=$true; break }
 }
 if (-not $found) {
-    $port = $selected.DefaultPort
-    while ($port -in $listeners.Port) { $port++ }
-    if ($port -gt 65535) { throw 'No available local debug port.' }
-    Write-Host "Restarting only $($selected.Name) with remote debugging (its calls will drop)..." -ForegroundColor Cyan
-    Start-DiscordClient $selected $port
-    $null = Wait-Discord { Test-Port } 'Waiting for the selected client debug port.' 30
+    $declaredPort = Get-DiscordDebugPort $selected.CommandLine
+    if ($null -ne $declaredPort) {
+        Write-Host 'Remote debugging is already enabled; waiting for its endpoint...' -ForegroundColor Cyan
+        if ($declaredPort) { $port = $declaredPort }
+    } else {
+        $port = $selected.DefaultPort
+        while ($port -in $listeners.Port) { $port++ }
+        if ($port -gt 65535) { throw 'No available local debug port.' }
+        Write-Host "Restarting only $($selected.Name) with remote debugging (its calls will drop)..." -ForegroundColor Cyan
+        Start-DiscordClient $selected $port
+    }
+    if ($declaredPort -eq 0) {
+        $null = Wait-Discord { foreach ($listener in @(Get-DiscordListeners | Where-Object ProcessId -eq $selected.ProcessId)) { $port=$listener.Port; if (Test-Port) { return $true } } } 'Waiting for the selected client debug port.'
+    } else {
+        $null = Wait-Discord { Test-Port } 'Waiting for the selected client debug port.' 30
+    }
 }
+$port = $selected.DebugPort
 Write-Host 'Locating the Discord window...' -ForegroundColor Cyan
 $page = Wait-Discord {
-    try { $pages = @(Invoke-RestMethod "http://127.0.0.1:$port/json" -TimeoutSec ((Get-DiscordStartupTimeout 3000)/1000) | ForEach-Object { $_ } | Where-Object { $_.type -eq 'page' -and $_.url -match '^https://(?:[a-z0-9-]+\.)?discord\.com/(?:channels|quest-home|app)(?:/|$)' }) } catch { return $null }
+    try { $pages = @(Get-DiscordDebugJson $selected.DebugHost $port '/json' (Get-DiscordStartupTimeout 3000) | ForEach-Object { $_ } | Where-Object { $_.type -eq 'page' -and $_.url -match '^https://(?:[a-z0-9-]+\.)?discord\.com/(?:channels|quest-home|app)(?:/|$)' }) } catch { return $null }
     $pages
 } 'Waiting for the main window. Open Discord and log in if needed.'
 $startupWait.Stop()
 try { $page = Select-DiscordPage @($page) } finally { $startupWait.Start() }
 if (-not $page) { Write-Host 'Cancelled.'; return }
 if (-not (Test-Port)) { throw 'The selected Discord client debug port is no longer available.' }
-$socket = Get-DiscordSocketUrl $page $port
+$socket = Get-DiscordSocketUrl $page $port $selected.DebugHost
 
 
 $ws = [Net.WebSockets.ClientWebSocket]::new()
+$ws.Options.Proxy = $null
 try {
     $connectCancellation = [Threading.CancellationTokenSource]::new((Get-DiscordStartupTimeout 5000))
     try { [void]$ws.ConnectAsync([Uri]$socket, $connectCancellation.Token).GetAwaiter().GetResult() }
@@ -316,8 +395,25 @@ try {
         } catch { return $null } finally { $cts.Dispose() }
     }
 
-    # The renderer may still be booting; wait for its webpack registry before injecting.
-    $null = Wait-Discord { (Invoke-Cdp "typeof webpackChunkdiscord_app" (Get-DiscordStartupTimeout 3000)).result.result.value -eq 'object' } 'Waiting for Discord to finish loading.'
+    # The chunk array exists before the app is usable; wait for the mounted app and signed-in user store.
+    $rendererReady = @'
+(() => {
+    if (document.readyState !== 'complete' || !document.body || !document.querySelector('#app-mount')?.childElementCount || typeof webpackChunkdiscord_app === 'undefined') return false;
+    let req;
+    webpackChunkdiscord_app.push([[Symbol('riyo-ready')], {}, value => {
+        if (Object.keys(value.c || {}).length > Object.keys(req?.c || {}).length) req = value;
+    }]);
+    webpackChunkdiscord_app.pop();
+    if (!req?.c) return false;
+    return Object.values(req.c).some(module => {
+        try {
+            const exports = module?.exports;
+            return [exports, ...Object.values(exports || {})].some(value => typeof value?.getCurrentUser === 'function' && !!value.getCurrentUser());
+        } catch { return false; }
+    });
+})()
+'@
+    $null = Wait-Discord { (Invoke-Cdp $rendererReady (Get-DiscordStartupTimeout 3000)).result.result.value -eq $true } 'Waiting for Discord to finish loading.'
 
     if (-not (Test-Port)) { throw 'The selected Discord client debug port is no longer available.' }
     Write-Host "Injecting..." -ForegroundColor Cyan

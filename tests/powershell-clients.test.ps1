@@ -4,7 +4,7 @@ function Assert($condition, $message) { if (-not $condition) { throw $message } 
 $root = Split-Path $PSScriptRoot -Parent
 $source = Get-Content "$root/powershell/run.ps1" -Raw
 $ast = [Management.Automation.Language.Parser]::ParseInput($source,[ref]$null,[ref]$null)
-foreach ($name in 'Select-DiscordClient','Get-DiscordClients','Test-Port','Test-DiscordRunning','Wait-Discord','Get-DiscordLaunchArguments','Start-DiscordClient','Select-DiscordPage','Get-DiscordSocketUrl') {
+foreach ($name in 'Select-DiscordClient','Get-DiscordClients','Get-DiscordLoopback','Test-Port','Test-DiscordRunning','Wait-Discord','Initialize-DiscordCommandLine','Get-DiscordProfileKey','Get-DiscordDebugPort','Get-DiscordLaunchArguments','Start-DiscordClient','Select-DiscordPage','Get-DiscordSocketUrl') {
     $node = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name },$true)
     . ([scriptblock]::Create($node.Extent.Text))
 }
@@ -46,8 +46,8 @@ $stopped = [pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=0;Executable=
     $selected=$canary
     $port=9222
     function Get-DiscordListeners { [pscustomobject]@{ProcessId=101;Port=9222}; [pscustomobject]@{ProcessId=202;Port=9444} }
-    function Invoke-RestMethod($Uri,$TimeoutSec) {
-        Assert ($Uri -eq 'http://127.0.0.1:9444/json/version') 'Never request the other client debug endpoint'
+    function Get-DiscordDebugJson($DebugHost,$DebugPort,$Path,$TimeoutMilliseconds) {
+        Assert ($DebugHost -eq '127.0.0.1' -and $DebugPort -eq 9444 -and $Path -eq '/json/version') 'Never request the other client debug endpoint'
         @{Browser='Chrome';'Protocol-Version'='1.3'}
     }
     Assert (-not (Test-Port)) 'A valid debug port belonging to another process must not be reused'
@@ -62,13 +62,65 @@ $stopped = [pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=0;Executable=
     Assert ($values[2] -eq '--label=one"two') 'Preserve embedded quotes'
     Assert ($values[3] -eq '--path=C:\tail\') 'Preserve trailing backslashes'
     Assert ($values[4] -eq '--remote-debugging-port=9444' -and $values.Count -eq 5) 'Replace the previous debug port exactly once'
+    Assert ((Get-DiscordProfileKey '"discord.exe" --user-data-dir "C:\Profile A" --profile-directory "Profile 2"') -eq (Get-DiscordProfileKey '"discord.exe" "--profile-directory=Profile 2" "--user-data-dir=C:\Profile A"')) 'Match profiles regardless of argument order, quoting, or equals signs'
+    foreach ($flag in '--remote-debugging-port=9444','"--remote-debugging-port=9444"','--remote-debugging-port 9444','"--remote-debugging-port" "9444"') {
+        Assert ((Get-DiscordDebugPort ('"discord.exe" '+$flag)) -eq 9444) 'Recognize an existing debug flag before deciding to restart'
+    }
+    Assert ((Get-DiscordDebugPort 'discord.exe --remote-debugging-port=0') -eq 0) 'Port zero means an automatically assigned debug port'
+    Assert ($null -eq (Get-DiscordDebugPort 'discord.exe --remote-debugging-port=999999999999999999999')) 'Ignore invalid port numbers without overflowing'
+}
+& {
+    $macOS=$false
+    $selected=$stable.PSObject.Copy()
+    $selected | Add-Member NoteProperty LaunchedAt ([DateTime]::UtcNow.AddSeconds(-2))
+    $selected | Add-Member NoteProperty PreviousProcessIds @(101,105,202)
+    $selected.ProcessId=303
+    $port=9444
+    $replacement=[pscustomobject]@{Name='Discord';ProcessId=404;Executable=$stable.Executable;Created=[DateTime]::UtcNow;CommandLine='"C:\Discord\Discord.exe" "--user-data-dir=C:\Profiles\A B" --remote-debugging-port=9444'}
+    function Get-DiscordListeners { [pscustomobject]@{Address='[::1]';ProcessId=404;Port=9444} }
+    function Get-DiscordClients { $replacement }
+    function Get-DiscordDebugJson($DebugHost,$DebugPort) {
+        Assert ($DebugHost -eq '[::1]' -and $DebugPort -eq 9444) 'Use the address family actually owned by the selected replacement'
+        @{Browser='Chrome';'Protocol-Version'='1.3'}
+    }
+    Assert (Test-Port) 'Follow a new main PID after the launched process relaunches itself'
+    Assert ($selected.ProcessId -eq 404 -and $selected.DebugHost -eq '[::1]') 'Retain the confirmed PID and IPv6 address'
+    $selected.ProcessId=303
+    $replacement.CommandLine='"C:\Discord\Discord.exe" "--user-data-dir=C:\Profiles\Other"'
+    Assert (-not (Test-Port)) 'Never rebind the selection to another profile'
+    $replacement.CommandLine=$stable.CommandLine
+    $replacement.ProcessId=105
+    function Get-DiscordListeners { [pscustomobject]@{Address='127.0.0.1';ProcessId=105;Port=9444} }
+    Assert (-not (Test-Port)) 'Never adopt another instance that was already running before launch'
+    $replacement.ProcessId=404
+    $replacement.Created=$selected.LaunchedAt.AddSeconds(-1)
+    function Get-DiscordListeners { [pscustomobject]@{Address='127.0.0.1';ProcessId=404;Port=9444} }
+    Assert (-not (Test-Port)) 'Reject older processes even if the PID snapshot missed them'
+    $replacement.Created=[DateTime]::UtcNow
+    function Get-DiscordListeners { [pscustomobject]@{Address='[::1]';ProcessId=404;Port=9444} }
+    $selected.Executable='C:\ProgramData\User\DiscordPTB\app-1.0.1224\Discord.exe'
+    $replacement.Executable='C:\ProgramData\User\DiscordPTB\app-1.0.1229\Discord.exe'
+    Assert (Test-Port) 'Follow an automatic version update within the same custom installation'
+    $selected.ProcessId=303
+    $replacement.Executable='C:\OtherInstall\app-1.0.1229\Discord.exe'
+    Assert (-not (Test-Port)) 'Do not cross into a different installation while following an update'
 }
 & {
     $macOS=$false
     $target=$stable.PSObject.Copy()
     $script:killed=@(); $script:started=$null
-    function Stop-Process($Id,[switch]$Force,$ErrorAction) { $script:killed += $Id }
-    function Start-DiscordProcess($FilePath,$Arguments,[switch]$Hidden) { $script:started=@($FilePath,$Arguments,$Hidden.IsPresent); 303 }
+    function Stop-Process($Id,[switch]$Force,$ErrorAction) {
+        Assert ($null -ne $target.LaunchedAt -and 101 -in $target.PreviousProcessIds) 'Record the restart boundary before the old process can spawn an updater'
+        $script:killed += $Id
+    }
+    function Get-DiscordClients { $stable; $canary }
+    function Get-Process($Id,$ErrorAction) {
+        $process=New-Object PSObject
+        $process | Add-Member ScriptMethod WaitForExit { param($timeout) Assert ($timeout -le 5000) 'Bound the old-process wait'; $script:exited=$true; $true }
+        $process | Add-Member ScriptMethod Dispose { }
+        $process
+    }
+    function Start-DiscordProcess($FilePath,$Arguments,[switch]$Hidden) { Assert $script:exited 'Do not relaunch before the old process has exited'; $script:started=@($FilePath,$Arguments,$Hidden.IsPresent); 303 }
     Start-DiscordClient $target 9444
     Assert ($script:killed.Count -eq 1 -and $script:killed[0] -eq 101) 'Restart only the selected PID, never all processes with that name'
     Assert ($script:started[0] -eq $stable.Executable -and $target.ProcessId -eq 303) 'Track the newly launched client'
@@ -104,6 +156,7 @@ $stopped = [pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=0;Executable=
     function Read-Host { '2' }
     Assert ((Select-DiscordPage @($first,$second)).title -eq 'Other window') 'Multiple renderer windows must be explicitly selected'
     Assert ((Get-DiscordSocketUrl $second 9444) -eq $second.webSocketDebuggerUrl) 'Allow the selected local socket'
+    Assert ((Get-DiscordSocketUrl ([pscustomobject]@{webSocketDebuggerUrl='ws://localhost:9444/devtools/page/BBB'}) 9444 '[::1]') -eq 'ws://[::1]:9444/devtools/page/BBB') 'Normalize local CDP advertisements to the verified listener address'
     foreach ($url in 'ws://127.0.0.1:9222/devtools/page/AAA','ws://evil.test:9444/devtools/page/AAA','ws://127.0.0.1:9444@evil.test/devtools/page/AAA') {
         $failed=$false
         try { $null=Get-DiscordSocketUrl ([pscustomobject]@{webSocketDebuggerUrl=$url}) 9444 } catch { $failed=$true }
@@ -112,13 +165,41 @@ $stopped = [pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=0;Executable=
 }
 & {
     $macOS=$false
+    $Client='ptb'
+    $target=[pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=202;CommandLine='"C:\ProgramData\User\DiscordPTB.exe" --remote-debugging-port=9223';DefaultPort=9223}
+    $script:polls=0
+    function Get-DiscordClients { $target }
+    function Get-DiscordListeners {
+        $script:polls++
+        if ($script:polls -ge 3) { [pscustomobject]@{ProcessId=202;Port=9223;Address='[::1]'} }
+        [pscustomobject]@{ProcessId=101;Port=9222;Address='127.0.0.1'}
+    }
+    function Start-DiscordClient { throw 'Already enabled debugging must be awaited, never restarted' }
+    function Test-DiscordRunning { $true }
+    function Start-Sleep { }
+    function Get-DiscordDebugJson($DebugHost,$DebugPort,$Path,$TimeoutMilliseconds) {
+        Assert ($DebugHost -eq '[::1]' -and $DebugPort -eq 9223) 'Do not fall back to another running client while the selected port starts'
+        if ($Path -eq '/json/version') { return @{Browser='Chrome';'Protocol-Version'='1.3'} }
+        [pscustomobject]@{type='page';title='PTB';url='https://ptb.discord.com/channels/@me';webSocketDebuggerUrl='ws://localhost:9223/devtools/page/PTB'}
+    }
+    $start=$source.LastIndexOf('$selected = Select-DiscordClient')
+    $end=$source.IndexOf('$ws = [Net.WebSockets.ClientWebSocket]')
+    . ([scriptblock]::Create($source.Substring($start,$end-$start)))
+    Assert ($script:polls -ge 3 -and $socket -eq 'ws://[::1]:9223/devtools/page/PTB') 'The first run must wait through delayed port startup and select the correct IPv6 window'
+    $target.CommandLine='discord.exe --remote-debugging-port=0'
+    $script:polls=0
+    . ([scriptblock]::Create($source.Substring($start,$end-$start)))
+    Assert ($port -eq 9223) 'Auto-assigned port discovery must survive probe scope and remain available for injection'
+}
+& {
+    $macOS=$false
     $Client='canary'
     function Get-DiscordClients { $stable; $canary }
     function Get-DiscordListeners { [pscustomobject]@{ProcessId=101;Port=9222}; [pscustomobject]@{ProcessId=202;Port=9444} }
     function Start-DiscordClient { throw 'Do not restart a client with its own working debug port' }
-    function Invoke-RestMethod($Uri,$TimeoutSec) {
-        Assert ($Uri.StartsWith('http://127.0.0.1:9444/')) 'The complete discovery flow must stay on the selected client port'
-        if ($Uri.EndsWith('/json/version')) { return @{Browser='Chrome';'Protocol-Version'='1.3'} }
+    function Get-DiscordDebugJson($DebugHost,$DebugPort,$Path,$TimeoutMilliseconds) {
+        Assert ($DebugHost -eq '127.0.0.1' -and $DebugPort -eq 9444) 'The complete discovery flow must stay on the selected client port'
+        if ($Path -eq '/json/version') { return @{Browser='Chrome';'Protocol-Version'='1.3'} }
         foreach ($id in 'AAA','BBB') { [pscustomobject]@{type='page';title=$id;url='https://discord.com/channels/@me';webSocketDebuggerUrl="ws://127.0.0.1:9444/devtools/page/$id"} }
     }
     function Read-Host { Assert (-not $startupWait.IsRunning) 'Pause the startup deadline during window selection'; '2' }

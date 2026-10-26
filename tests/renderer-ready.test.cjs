@@ -1,0 +1,25 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(require('node:path').join(__dirname, '../powershell/run.ps1'), 'utf8');
+const probe = source.match(/\$rendererReady = @'\r?\n([\s\S]*?)\r?\n'@/)[1];
+const document = { readyState: 'complete', body: {}, querySelector: () => ({ childElementCount: 1 }) };
+const evaluate = (chunk, doc = document) => vm.runInNewContext(probe, { document: doc, webpackChunkdiscord_app: chunk });
+assert.equal(evaluate([], { ...document, readyState: 'loading' }), false);
+assert.equal(evaluate([], { ...document, querySelector: () => null }), false);
+assert.equal(evaluate(undefined), false);
+const bootstrap = [];
+assert.equal(evaluate(bootstrap), false, 'the initial chunk array must not count as a loaded application');
+assert.equal(bootstrap.length, 0, 'the probe must clean up its temporary chunk');
+const store = { getCurrentUser: () => null };
+const chunk = [];
+chunk.push = function (value) {
+    value[2]({ c: { broken: { get exports() { throw Error('not loaded'); } }, user: { exports: { Z: store } } } });
+    value[2]({ c: { auxiliary: { exports: {} } } });
+    return Array.prototype.push.call(this, value);
+};
+assert.equal(evaluate(chunk), false, 'wait for the signed-in user store');
+store.getCurrentUser = () => ({ id: 'offline-test-user' });
+assert.equal(evaluate(chunk), true);
+assert.equal(chunk.length, 0);
+console.log('PASS: renderer waits through bootstrap, DOM loading, and absent login state before allowing injection.');

@@ -44,7 +44,7 @@ foreach ($name in 'Get-DiscordStartupTimeout', 'Test-DiscordRunning', 'Wait-Disc
     function Write-Host { }
     function Test-DiscordRunning { $true }
     function Start-Sleep { $startupWait.Elapsed.TotalMilliseconds += 1000 }
-    function Invoke-RestMethod {
+    function Get-DiscordDebugJson {
         $script:windowChecks++
         if ($script:windowChecks -eq 10) { throw 'Temporary startup connection failure' }
         if ($script:windowChecks -lt 40) { return [pscustomobject]@{ type = 'page'; url = 'https://discord.com/login' } }
