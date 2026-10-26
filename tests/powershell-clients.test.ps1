@@ -68,11 +68,17 @@ $stopped = [pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=0;Executable=
     $target=$stable.PSObject.Copy()
     $script:killed=@(); $script:started=$null
     function Stop-Process($Id,[switch]$Force,$ErrorAction) { $script:killed += $Id }
-    function Start-Process($FilePath,$ArgumentList,[switch]$PassThru) { $script:started=@($FilePath,$ArgumentList); [pscustomobject]@{Id=303} }
+    function Start-DiscordProcess($FilePath,$Arguments,[switch]$Hidden) { $script:started=@($FilePath,$Arguments,$Hidden.IsPresent); 303 }
     Start-DiscordClient $target 9444
     Assert ($script:killed.Count -eq 1 -and $script:killed[0] -eq 101) 'Restart only the selected PID, never all processes with that name'
     Assert ($script:started[0] -eq $stable.Executable -and $target.ProcessId -eq 303) 'Track the newly launched client'
     Assert ($script:started[1].Contains('--user-data-dir=C:\Profiles\A B')) 'Keep the selected profile on restart'
+    Assert (-not $script:started[2]) 'Keep the Discord app window visible'
+    $target=[pscustomobject]@{Name='DiscordPTB';Executable='C:\PTB\Update.exe';Updater=$true;ProcessId=0}
+    Start-DiscordClient $target 9223
+    Assert ($script:killed.Count -eq 1) 'Starting an installed client must not stop another client'
+    Assert ($script:started[0] -eq $target.Executable -and $script:started[2]) 'Detach the updater too, keeping its helper window hidden'
+    Assert ($script:started[1] -eq '--processStart DiscordPTB.exe --process-start-args "--remote-debugging-port=9223"') 'Preserve updater forwarding of the selected debug port'
 }
 & {
     $macOS=$true

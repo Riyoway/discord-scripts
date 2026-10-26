@@ -196,6 +196,19 @@ public static class RiyoScriptCommandLine {
     $kept += "--remote-debugging-port=$DebugPort"
     ($kept | ForEach-Object { '"' + [regex]::Replace([regex]::Replace($_, '(\\*)"', '$1$1\"'), '(\\+)$', '$1$1') + '"' }) -join ' '
 }
+function Start-DiscordProcess($FilePath, $Arguments, [switch]$Hidden) {
+    $info = New-Object Diagnostics.ProcessStartInfo
+    $info.FileName = $FilePath
+    $info.Arguments = $Arguments
+    $info.WorkingDirectory = [IO.Path]::GetDirectoryName($FilePath)
+    $info.UseShellExecute = $false
+    $info.CreateNoWindow = $true
+    # Electron otherwise attaches to PowerShell's console and exits when that console closes.
+    $info.EnvironmentVariables['ELECTRON_NO_ATTACH_CONSOLE'] = '1'
+    if ($Hidden) { $info.WindowStyle = [Diagnostics.ProcessWindowStyle]::Hidden }
+    $process = [Diagnostics.Process]::Start($info)
+    try { $process.Id } finally { $process.Dispose() }
+}
 function Start-DiscordClient($Target, $DebugPort) {
     $null = Get-DiscordStartupTimeout 1000
     if ($macOS) {
@@ -216,13 +229,13 @@ function Start-DiscordClient($Target, $DebugPort) {
         return
     }
     if ($Target.Updater) {
-        $null = Start-Process -FilePath $Target.Executable -ArgumentList "--processStart $($Target.Name).exe --process-start-args `"--remote-debugging-port=$DebugPort`"" -PassThru -WindowStyle Hidden
+        $null = Start-DiscordProcess $Target.Executable "--processStart $($Target.Name).exe --process-start-args `"--remote-debugging-port=$DebugPort`"" -Hidden
         return
     }
     if (-not $Target.Executable -or -not $Target.CommandLine) { throw 'Cannot read the selected client executable or arguments. Use a terminal with the same privileges as Discord.' }
     $arguments = Get-DiscordLaunchArguments $Target.CommandLine $DebugPort
     Stop-Process -Id $Target.ProcessId -Force -ErrorAction Stop
-    $Target.ProcessId = (Start-Process -FilePath $Target.Executable -ArgumentList $arguments -PassThru).Id
+    $Target.ProcessId = Start-DiscordProcess $Target.Executable $arguments
 }
 function Select-DiscordPage($Pages) {
     $items = @($Pages)
