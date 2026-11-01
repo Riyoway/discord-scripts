@@ -577,7 +577,7 @@
             <p class="riyo-muted">Instant uses simulated activity. Natural runs in real time.</p>
             <div id="bd-box-instant" class="riyo-stack">
                 <details class="riyo-details" open><summary>${riyoIcon("clock")}Game Time Badge</summary><div class="riyo-stack">
-                <label class="riyo-label">Total game hours (0 = skip)<input id="bd-hours" type="number" min="0" step="0.5" value="1"></label>
+                <label class="riyo-label">Total game hours (0 = skip)<input id="bd-hours" type="number" min="0" step="0.5" value="5000"></label>
                 <div class="riyo-options" id="bd-times">
                     <button type="button" id="bd-time-1">Casual 1h</button>
                     <button type="button" id="bd-time-5">Recreational 5h</button>
