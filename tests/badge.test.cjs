@@ -153,6 +153,7 @@ test('time tiers: impossible totals disabled for the chosen variety', async () =
     const { sandbox } = b;
     await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
     const q = s => b.panel.querySelector(s);
+    q('#bd-hours').value = '1';
     q('#bd-var-20').click(); // min total 10h
     assert.equal(q('#bd-time-5').disabled, true);
     assert.equal(q('#bd-time-20').disabled, false);
