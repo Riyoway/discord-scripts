@@ -560,6 +560,14 @@
                 <strong class="riyo-title">${riyoHeading('badge')}</strong>
                 <button type="button" class="riyo-close" id="bd-close" aria-label="Close badge">${riyoIcon("close")}</button>
             </header>
+            <style>.bd-app{display:flex;gap:12px;min-height:0}.bd-side{display:flex;flex-direction:column;gap:6px;min-width:132px}.bd-side button{justify-content:flex-start;font-size:12px;min-height:34px}.bd-side button[aria-pressed="true"]{background:#f5f5f5;color:#111;border-color:#f5f5f5}.bd-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto}</style>
+            <div class="bd-app">
+            <nav class="bd-side" aria-label="Badge sections">
+                <button type="button" id="bd-nav-games" aria-pressed="true">${riyoIcon("clock")} Game</button>
+                <button type="button" id="bd-nav-hype" aria-pressed="false">${riyoIcon("badge")} HypeSquad</button>
+            </nav>
+            <div class="bd-main">
+            <div id="bd-view-games" class="riyo-stack">
             <fieldset class="riyo-segmented" aria-label="Activity mode">
                 <label><input type="radio" name="bd-mode" id="bd-mode-instant" checked>${riyoIcon('play')}Instant</label>
                 <label><input type="radio" name="bd-mode" id="bd-mode-natural">${riyoIcon('clock')}Natural</label>
@@ -633,6 +641,8 @@
                     <button type="button" id="bd-start-n" class="riyo-primary">${riyoIcon("play")} Start</button>
                 </div>
             </div>
+            </div>
+            <div id="bd-view-hype" class="riyo-stack" hidden>
             <div class="riyo-section riyo-section-title">${riyoIcon('badge')}HypeSquad</div>
             <p class="riyo-muted">Changes your real house membership.</p>
             <input id="bd-house" type="hidden" value="1">
@@ -646,9 +656,23 @@
                 <button type="button" id="bd-leave">${riyoIcon("close")} Leave</button>
                 <button type="button" id="bd-join" class="riyo-primary">${riyoIcon("play")} Join</button>
             </div>
+            </div>
+            </div>
+            </div>
         `;
         riyoMountPanel(panel, 'badge');
+        panel.style.width = "560px";
+        panel.style.maxWidth = "calc(100vw - 32px)";
         const $ = id => panel.querySelector("#" + id);
+        const showView = name => {
+            const games = name === "games";
+            $("bd-view-games").hidden = !games;
+            $("bd-view-hype").hidden = games;
+            $("bd-nav-games").setAttribute("aria-pressed", String(games));
+            $("bd-nav-hype").setAttribute("aria-pressed", String(!games));
+        };
+        $("bd-nav-games").addEventListener("click", () => showView("games"));
+        $("bd-nav-hype").addEventListener("click", () => showView("hype"));
         const statusI = $("bd-status-instant"), statusN = $("bd-status-n"), statusH = $("bd-status-hype");
         const boxI = $("bd-box-instant"), boxN = $("bd-box-natural");
 

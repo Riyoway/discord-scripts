@@ -27,6 +27,7 @@ function boot() {
                 const node = new Element('x');
                 node.value = match[1].match(/\bvalue="([^"]*)"/)?.[1] ?? (match[0].startsWith('<select') ? '1' : '');
                 node.checked = /\bchecked\b/.test(match[1]);
+                if (/\bhidden\b/.test(match[1])) node.hidden = true;
                 this.nodes.set('#' + id[1], node);
             }
         }
@@ -232,6 +233,20 @@ test('time presets: clicking a tier fills hours per game', async () => {
     assert.equal(q('#bd-hours').value, '20');
     q('#bd-time-5000').click();
     assert.equal(q('#bd-hours').value, '5000');
+});
+
+test('sidebar: switches between game and hypesquad views', async () => {
+    const b = boot();
+    const { sandbox } = b;
+    await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
+    const q = s => b.panel.querySelector(s);
+    assert.equal(q('#bd-view-hype').hidden, true);
+    q('#bd-nav-hype').click();
+    assert.equal(q('#bd-view-hype').hidden, false);
+    assert.equal(q('#bd-view-games').hidden, true);
+    q('#bd-nav-games').click();
+    assert.equal(q('#bd-view-games').hidden, false);
+    assert.equal(q('#bd-view-hype').hidden, true);
 });
 
 test('hypesquad: join posts house, leave deletes', async () => {
