@@ -670,8 +670,16 @@
             $("bd-tier-" + h).addEventListener("click", () => { $("bd-streamhours").value = String(h); });
         }
         for (const n of [2, 5, 10, 15, 20, 30, 40, 60, 80, 105, 0]) {
-            $("bd-var-" + n).addEventListener("click", () => { $("bd-maxgames").value = String(n); });
+            $("bd-var-" + n).addEventListener("click", () => { $("bd-maxgames").value = String(n); refreshTimeButtons(); });
         }
+        const refreshTimeButtons = () => {
+            // total must cover 0.5h per game; disable tiers that cannot
+            const n = clampInt($("bd-maxgames").value, 0, 20000, 0);
+            for (const h of [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]) {
+                $("bd-time-" + h).disabled = n > 0 && h < n * 0.5;
+            }
+        };
+        $("bd-maxgames").addEventListener("input", refreshTimeButtons);
         for (const h of [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]) {
             $("bd-time-" + h).addEventListener("click", () => { $("bd-hours").value = String(h); });
         }
@@ -711,8 +719,8 @@
                     const list = maxGames > 0 ? games.slice(0, maxGames) : games;
                     if (!list.length) throw new Error("No games to send.");
                     const perGame = hours / list.length;
+                    if (perGame < 0.5) throw new Error(`Needs ≥${(list.length * 0.5).toLocaleString()}h total for ${list.length.toLocaleString()} games (0.5h each).`);
                     const dur = Math.floor(perGame * 3600 * 1000);
-                    if (perGame < 0.5) statusI.textContent = `Note: ${perGame.toFixed(2)}h/game may not count toward variety.`;
                     progress.max = list.length; progress.value = 0;
                     let ok = 0;
                     for (let i = 0; i < list.length; i += 50) {

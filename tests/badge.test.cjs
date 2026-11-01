@@ -132,7 +132,7 @@ test('instant games: posts launch + heartbeats with configured duration', async 
     assert.ok(finals.every(e => typeof e.properties.event_sequence_number === 'number'));
 });
 
-test('instant games: total hours split across games, warns below 0.5h each', async () => {
+test('instant games: blocks totals below 0.5h per game', async () => {
     const b = boot();
     const { sandbox, science } = b;
     await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
@@ -143,10 +143,21 @@ test('instant games: total hours split across games, warns below 0.5h each', asy
     const p = q('#bd-run-instant').click();
     await sandbox.window.fetch('https://discord.com/x', { headers: { 'x-super-properties': 'SP' } });
     await p;
-    await tick(() => q('#bd-status-instant').textContent.includes('done'), 'games done');
-    assert.equal(science.length, 1);
-    const finals = science[0].filter(e => e.type === 'running_game_heartbeat' && e.properties.final_heartbeat);
-    assert.ok(finals.every(e => e.properties.duration_tracked_ms === 0.25 * 3600 * 1000));
+    await tick(() => /0\.5h each/.test(q('#bd-status-instant').textContent), 'blocked message');
+    assert.equal(science.length, 0);
+});
+
+test('time tiers: impossible totals disabled for the chosen variety', async () => {
+    const b = boot();
+    const { sandbox } = b;
+    await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
+    const q = s => b.panel.querySelector(s);
+    q('#bd-var-20').click(); // min total 10h
+    assert.equal(q('#bd-time-5').disabled, true);
+    assert.equal(q('#bd-time-20').disabled, false);
+    q('#bd-var-5').click(); // min total 2.5h
+    assert.equal(q('#bd-time-1').disabled, true);
+    assert.equal(q('#bd-time-5').disabled, false);
 });
 
 test('instant stream: posts 4-event session with inflated duration', async () => {
