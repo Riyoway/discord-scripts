@@ -13,6 +13,7 @@ Scripts for Discord, served from the [script library](https://script.riyo.me/lib
 | [`snowflake`](console/snowflake.js) | Decodes an ID or message link into its creation time and a Discord timestamp |
 | [`search`](console/search.js) | Searches current-channel messages with keywords or RegExp; exports TXT/JSON |
 | [`Discord Game Time & Game Variety Badge`](console/badge-gametime.js) (`badge-gametime`) | Rotates desktop game activity every 23–38 minutes; restores game detection on Stop |
+| [`Badge`](console/badge.js) (`badge`) | Game time, variety, stream hours (instant spoof or natural rotation) plus HypeSquad join/leave, one panel |
 
 `snowflake` uses the timestamp bits and epoch documented in [Discord's Snowflake reference](https://docs.discord.com/developers/reference#snowflakes).
 
@@ -160,6 +161,10 @@ Loads Discord's public detectable-game catalog, then uses the desktop client's `
 **Session limit (hours)** defaults to 1,000 and caps actual session runtime. It does not instantly add those hours to a badge. The optional ±3% timing wobble defaults to enabled and stays within the 23–38 minute range. The panel shows the active game, next switch time, and different games shown. The former dry-run batch/delay controls are replaced by the rotation schedule.
 
 **Stop**, closing the panel, rerunning the script, or leaving the page cancels the timer and restores the patched methods. Advanced console controls remain available as `window.__multiGamePresence.next()` and `.stop()`. Badge progress is controlled by Discord and is not confirmed by a successful local activity dispatch. Run the offline checks with `node --test tests/badge-gametime.test.cjs`; they use a fake store and clock and do not access an account.
+
+## Badge (`badge`)
+
+One panel for four badges. The top table shows what each mode can earn. **Instant** posts fabricated `/science` events (game heartbeats with any duration, stream sessions via `voice_disconnect`) in minutes — backdated timestamps, no fingerprint. **Natural** is the `badge-gametime` rotation (game time + variety together, real telemetry, desktop app only, real elapsed time). **HypeSquad** calls the real membership API: pick a house (1 Bravery, 2 Brilliance, 3 Balance), **Join** adds the badge, **Leave** removes it. Badge progress is controlled by Discord (1–2 day cycle) and is not confirmed by a `204`. Run the offline checks with `node --test tests/badge.test.cjs`; they mock fetch/DOM and do not access an account.
 
 ## token
 
