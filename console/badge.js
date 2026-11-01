@@ -533,21 +533,23 @@
             if (typeof webpackChunkdiscord_app === "undefined") throw new Error("Discord webpack not found.");
             const wreq = webpackChunkdiscord_app.push([[Symbol("badge-hype")], {}, r => r]);
             webpackChunkdiscord_app.pop();
-            for (const [, func] of Object.entries(wreq.m)) {
-                let code = "";
-                try { code = func.toString(); } catch { continue; }
-                if (["HTTPUtils", ".get", ".post"].every(c => code.includes(c))) {
-                    const mod = wreq(func?.__webpackModuleId ?? Object.keys(wreq.m).find(id => { try { return wreq.m[id].toString() === code; } catch { return false; } }));
-                    const api = Object.values(mod || {}).find(e => e?.get);
-                    if (api?.post) return api;
+            const chunks = Object.entries(wreq.m);
+            const findChunkByCode = (...codes) => {
+                for (const [id, func] of chunks) {
+                    let code = "";
+                    try { code = func.toString(); } catch { continue; }
+                    if (codes.every(c => code.includes(c))) return wreq(id);
                 }
+                return null;
+            };
+            // user's snippet looks for the HTTP utils chunk; fall back to any
+            // chunk exporting get/post/del (chunk names differ per client build)
+            for (const codes of [["HTTPUtils"], ["getAPIBaseURL", ".post", ".del"]]) {
+                const mod = findChunkByCode(...codes);
+                const api = mod && Object.values(mod).find(e => e?.get && e?.post && e?.del);
+                if (api) return api;
             }
-            const fallback = Object.values(wreq.m)
-                .map(id => { try { return wreq(id); } catch { return null; } })
-                .flatMap(m => (m ? [m, m.default, ...(typeof m === "object" ? Object.values(m) : [])] : []))
-                .find(e => e?.get && e?.post);
-            if (!fallback) throw new Error("API module not found.");
-            return fallback;
+            throw new Error("API module not found.");
         };
 
         // ---- panel ----
