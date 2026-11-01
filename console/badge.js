@@ -581,7 +581,7 @@
                 <div class="riyo-options" id="bd-times">
                     <button type="button" id="bd-time-1"><img src="https://cdn.discordapp.com/assets/content/b75fcc4dd1c65dfd4169a203e21023453fd6fe853c9b5c1fd839781fda98e80d.svg" alt="" width="18" height="18">Casual 1h</button>
                     <button type="button" id="bd-time-5"><img src="https://cdn.discordapp.com/assets/content/f0f32cb2a0003475e443b76a7a2baf454356953ecb84195c7a08c3ce2fd95b70.svg" alt="" width="18" height="18">Recreational 5h</button>
-                    <button type="button" id="bd-time-20"><img src="https://cdn.discordapp.com/assets/content/e0c82f41bcad94a2a52713800fbef7687d0d2c6a6069b09d5e5876156d086e1a.svg" alt="" width="18" height="18">Dedicated 20h</button>
+                    <button type="button" id="bd-time-20"><img src="https://cdn.discordapp.com/assets/content/e0c82f41bcad94a2a52713800fbef7687d0d2c6a6066b09d5e5876156d086e1a.svg" alt="" width="18" height="18">Dedicated 20h</button>
                     <button type="button" id="bd-time-75"><img src="https://cdn.discordapp.com/assets/content/16f2aeb7465c99efce4d67d9333e3ddcf7435d6e60d2f5f93dc0c07bc7c5a69b.svg" alt="" width="18" height="18">Committed 75h</button>
                     <button type="button" id="bd-time-150"><img src="https://cdn.discordapp.com/assets/content/ba26e83fa68189b41837184e38706f41c288dd29ffba266035d1a5ad9adbae22.svg" alt="" width="18" height="18">Serious 150h</button>
                     <button type="button" id="bd-time-300"><img src="https://cdn.discordapp.com/assets/content/851b194288f1913ece6c8d99976519e48210580d6f42d994f21e37801611ad54.svg" alt="" width="18" height="18">Devoted 300h</button>
