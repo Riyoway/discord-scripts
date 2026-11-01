@@ -701,6 +701,8 @@
                 const maxGames = clampInt($("bd-maxgames").value, 0, 20000, 0);
                 const streamHours = clampNumber($("bd-streamhours").value, 0, 100000, 0);
                 const guild = $("bd-guild").value.trim(), channel = $("bd-channel").value.trim();
+                if (hours <= 0 && streamHours <= 0) throw new Error("Nothing to send: set game hours and/or stream hours.");
+                if (natural) { try { natural.stop(); } catch { /* ignore */ } natural = null; }
                 if (streamHours > 0) {
                     if (!guild || !channel) throw new Error("Guild + voice channel required for stream.");
                     lsSet(LS_GUILD, guild); lsSet(LS_CHANNEL, channel);
@@ -762,6 +764,7 @@
         // natural run
         $("bd-start-n").addEventListener("click", async () => {
             if (natural) return;
+            gen++; instant.stopFlag = true; // never run both modes at once
             $("bd-start-n").disabled = true; $("bd-stop-n").disabled = false;
             const progress = $("bd-progress-n");
             try {

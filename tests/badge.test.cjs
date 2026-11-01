@@ -187,6 +187,18 @@ test('instant stream: posts 4-event session with inflated duration', async () =>
     assert.equal(byType.screenshare_finished.duration, null);
 });
 
+test('instant run: nothing to send when both hours are zero', async () => {
+    const b = boot();
+    const { sandbox, science } = b;
+    await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
+    const q = s => b.panel.querySelector(s);
+    q('#bd-hours').value = '0';
+    q('#bd-streamhours').value = '0';
+    await q('#bd-run-instant').click();
+    await tick(() => /Nothing to send/.test(q('#bd-status-instant').textContent), 'nothing message');
+    assert.equal(science.length, 0);
+});
+
 test('tier presets: clicking a tier fills stream hours', async () => {
     const b = boot();
     const { sandbox } = b;
