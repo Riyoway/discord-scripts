@@ -678,6 +678,11 @@
             for (const h of [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]) {
                 $("bd-time-" + h).disabled = n > 0 && h < n * 0.5;
             }
+            // pull an impossible field value up to the minimum
+            if (n > 0) {
+                const cur = Number($("bd-hours").value);
+                if (!Number.isFinite(cur) || cur < n * 0.5) $("bd-hours").value = String(n * 0.5);
+            }
         };
         $("bd-maxgames").addEventListener("input", refreshTimeButtons);
         for (const h of [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]) {

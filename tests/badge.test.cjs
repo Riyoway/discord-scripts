@@ -155,9 +155,12 @@ test('time tiers: impossible totals disabled for the chosen variety', async () =
     q('#bd-var-20').click(); // min total 10h
     assert.equal(q('#bd-time-5').disabled, true);
     assert.equal(q('#bd-time-20').disabled, false);
+    assert.equal(q('#bd-hours').value, '10');
+    q('#bd-hours').value = '1';
     q('#bd-var-5').click(); // min total 2.5h
     assert.equal(q('#bd-time-1').disabled, true);
     assert.equal(q('#bd-time-5').disabled, false);
+    assert.equal(q('#bd-hours').value, '2.5');
 });
 
 test('instant stream: posts 4-event session with inflated duration', async () => {
