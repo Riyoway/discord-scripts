@@ -128,8 +128,25 @@ test('instant games: posts launch + heartbeats with configured duration', async 
     ]);
     assert.deepEqual(science[0].filter(e => e.type === 'launch_game').map(e => e.properties.game), ['Game 1', 'Game 2']);
     const finals = science[0].filter(e => e.type === 'running_game_heartbeat' && e.properties.final_heartbeat);
-    assert.ok(finals.every(e => e.properties.duration_tracked_ms === 2 * 3600 * 1000));
+    assert.ok(finals.every(e => e.properties.duration_tracked_ms === 1 * 3600 * 1000));
     assert.ok(finals.every(e => typeof e.properties.event_sequence_number === 'number'));
+});
+
+test('instant games: total hours split across games, warns below 0.5h each', async () => {
+    const b = boot();
+    const { sandbox, science } = b;
+    await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
+    const q = s => b.panel.querySelector(s);
+    q('#bd-hours').value = '0.5';
+    q('#bd-maxgames').value = '2';
+    q('#bd-streamhours').value = '0';
+    const p = q('#bd-run-instant').click();
+    await sandbox.window.fetch('https://discord.com/x', { headers: { 'x-super-properties': 'SP' } });
+    await p;
+    await tick(() => q('#bd-status-instant').textContent.includes('done'), 'games done');
+    assert.equal(science.length, 1);
+    const finals = science[0].filter(e => e.type === 'running_game_heartbeat' && e.properties.final_heartbeat);
+    assert.ok(finals.every(e => e.properties.duration_tracked_ms === 0.25 * 3600 * 1000));
 });
 
 test('instant stream: posts 4-event session with inflated duration', async () => {

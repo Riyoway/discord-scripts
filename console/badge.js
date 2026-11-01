@@ -567,7 +567,7 @@
             <p class="riyo-muted">Instant uses simulated activity. Natural runs in real time.</p>
             <div id="bd-box-instant" class="riyo-stack">
                 <details class="riyo-details" open><summary>${riyoIcon("clock")}Game Time Badge</summary><div class="riyo-stack">
-                <label class="riyo-label">Hours per game<input id="bd-hours" type="number" min="0" step="0.5" value="1"></label>
+                <label class="riyo-label">Total game hours (0 = skip)<input id="bd-hours" type="number" min="0" step="0.5" value="1"></label>
                 <div class="riyo-options" id="bd-times">
                     <button type="button" id="bd-time-1">Casual 1h</button>
                     <button type="button" id="bd-time-5">Recreational 5h</button>
@@ -709,7 +709,10 @@
                         games.push({ id: gid, name: g.name || "Unknown", exe: exe.name });
                     }
                     const list = maxGames > 0 ? games.slice(0, maxGames) : games;
-                    const dur = Math.floor(hours * 3600 * 1000);
+                    if (!list.length) throw new Error("No games to send.");
+                    const perGame = hours / list.length;
+                    const dur = Math.floor(perGame * 3600 * 1000);
+                    if (perGame < 0.5) statusI.textContent = `Note: ${perGame.toFixed(2)}h/game may not count toward variety.`;
                     progress.max = list.length; progress.value = 0;
                     let ok = 0;
                     for (let i = 0; i < list.length; i += 50) {
