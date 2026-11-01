@@ -580,6 +580,7 @@
                     <button type="button" id="bd-var-60">Maverick 60</button>
                     <button type="button" id="bd-var-80">Polymath 80</button>
                     <button type="button" id="bd-var-105">Universalist 100+</button>
+                    <button type="button" id="bd-var-0">All games</button>
                 </div>
                 </div>
                 <details class="riyo-details"><summary>${riyoIcon("video")}Streaming (optional)</summary><div class="riyo-stack">
@@ -654,7 +655,7 @@
         for (const h of [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]) {
             $("bd-tier-" + h).addEventListener("click", () => { $("bd-streamhours").value = String(h); });
         }
-        for (const n of [2, 5, 10, 15, 20, 30, 40, 60, 80, 105]) {
+        for (const n of [2, 5, 10, 15, 20, 30, 40, 60, 80, 105, 0]) {
             $("bd-var-" + n).addEventListener("click", () => { $("bd-maxgames").value = String(n); });
         }
 

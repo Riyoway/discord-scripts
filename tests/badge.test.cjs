@@ -176,6 +176,8 @@ test('variety presets: clicking a tier fills max games', async () => {
     assert.equal(q('#bd-maxgames').value, '20');
     q('#bd-var-105').click();
     assert.equal(q('#bd-maxgames').value, '105');
+    q('#bd-var-0').click();
+    assert.equal(q('#bd-maxgames').value, '0');
 });
 
 test('hypesquad: join posts house, leave deletes', async () => {
