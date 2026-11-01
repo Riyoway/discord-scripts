@@ -4,12 +4,13 @@ function Assert($condition, $message) { if (-not $condition) { throw $message } 
 $root = Split-Path $PSScriptRoot -Parent
 $source = Get-Content "$root/powershell/run.ps1" -Raw
 $ast = [Management.Automation.Language.Parser]::ParseInput($source,[ref]$null,[ref]$null)
-foreach ($name in 'Select-DiscordClient','Get-DiscordClients','Get-DiscordLoopback','Test-Port','Test-DiscordRunning','Wait-Discord','Initialize-DiscordCommandLine','Get-DiscordProfileKey','Get-DiscordDebugPort','Get-DiscordLaunchArguments','Start-DiscordClient','Select-DiscordPage','Get-DiscordSocketUrl') {
+foreach ($name in 'Select-DiscordClient','Get-DiscordClients','Get-DiscordLoopback','Confirm-DiscordProcess','Test-Port','Test-DiscordRunning','Wait-Discord','Initialize-DiscordCommandLine','Get-DiscordProfileKey','Get-DiscordDebugPort','Get-DiscordLaunchArguments','Start-DiscordClient','Select-DiscordPage','Get-DiscordSocketUrl') {
     $node = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name },$true)
     . ([scriptblock]::Create($node.Extent.Text))
 }
 function Get-DiscordStartupTimeout($MaximumMilliseconds) { $MaximumMilliseconds }
 function Write-Host { }
+function Get-DiscordDebugProcessId { throw 'No hidden-port identity mock was configured for this test' }
 $stable = [pscustomobject]@{Name='Discord';Key='stable';ProcessId=101;Executable='C:\Discord\Discord.exe';CommandLine='"C:\Discord\Discord.exe" "--user-data-dir=C:\Profiles\A B" --remote-debugging-port=9222';DefaultPort=9222}
 $canary = [pscustomobject]@{Name='DiscordCanary';Key='canary';ProcessId=202;Executable='C:\Canary\DiscordCanary.exe';CommandLine='"C:\Canary\DiscordCanary.exe"';DefaultPort=9224}
 $other = [pscustomobject]@{Name='Discord';Key='stable';ProcessId=105;Executable='C:\Discord\Discord.exe';CommandLine='"C:\Discord\Discord.exe" "--user-data-dir=C:\Profiles\Other"';DefaultPort=9222}
@@ -86,6 +87,10 @@ $stopped = [pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=0;Executable=
     Assert (Test-Port) 'Follow a new main PID after the launched process relaunches itself'
     Assert ($selected.ProcessId -eq 404 -and $selected.DebugHost -eq '[::1]') 'Retain the confirmed PID and IPv6 address'
     $selected.ProcessId=303
+    function Get-DiscordListeners { @() }
+    function Get-DiscordDebugProcessId { 404 }
+    Assert (Test-Port) 'Follow a confirmed replacement PID even when Windows hides its listening port'
+    $selected.ProcessId=303
     $replacement.CommandLine='"C:\Discord\Discord.exe" "--user-data-dir=C:\Profiles\Other"'
     Assert (-not (Test-Port)) 'Never rebind the selection to another profile'
     $replacement.CommandLine=$stable.CommandLine
@@ -157,6 +162,10 @@ $stopped = [pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=0;Executable=
     Assert ((Select-DiscordPage @($first,$second)).title -eq 'Other window') 'Multiple renderer windows must be explicitly selected'
     Assert ((Get-DiscordSocketUrl $second 9444) -eq $second.webSocketDebuggerUrl) 'Allow the selected local socket'
     Assert ((Get-DiscordSocketUrl ([pscustomobject]@{webSocketDebuggerUrl='ws://localhost:9444/devtools/page/BBB'}) 9444 '[::1]') -eq 'ws://[::1]:9444/devtools/page/BBB') 'Normalize local CDP advertisements to the verified listener address'
+    Assert ((Get-DiscordSocketUrl ([pscustomobject]@{webSocketDebuggerUrl='ws://localhost:9444/devtools/browser/ABC'}) 9444 '127.0.0.1' 'browser') -eq 'ws://127.0.0.1:9444/devtools/browser/ABC') 'Browser identity sockets must use the same validated local host and port'
+    $failed=$false
+    try { $null=Get-DiscordSocketUrl $second 9444 '127.0.0.1' 'browser' } catch { $failed=$true }
+    Assert $failed 'Do not use a renderer socket as a browser identity endpoint'
     foreach ($url in 'ws://127.0.0.1:9222/devtools/page/AAA','ws://evil.test:9444/devtools/page/AAA','ws://127.0.0.1:9444@evil.test/devtools/page/AAA') {
         $failed=$false
         try { $null=Get-DiscordSocketUrl ([pscustomobject]@{webSocketDebuggerUrl=$url}) 9444 } catch { $failed=$true }
@@ -207,6 +216,36 @@ $stopped = [pscustomobject]@{Name='DiscordPTB';Key='ptb';ProcessId=0;Executable=
     $end=$source.IndexOf('$ws = [Net.WebSockets.ClientWebSocket]')
     . ([scriptblock]::Create($source.Substring($start,$end-$start)))
     Assert ($socket -eq 'ws://127.0.0.1:9444/devtools/page/BBB') 'Choose both the requested client and renderer before injection'
+}
+& {
+    $macOS=$false
+    $Client='stable'
+    $target=$stable.PSObject.Copy()
+    $script:identityChecks=0
+    function Get-DiscordClients { $target }
+    function Get-DiscordListeners { @() }
+    function Start-DiscordClient { throw 'Do not restart a verified client just because netstat hides its port' }
+    function Get-DiscordDebugProcessId($Version,$DebugHost,$DebugPort) {
+        Assert ($DebugHost -eq '127.0.0.1' -and $DebugPort -eq 9222) 'Only inspect the selected local endpoint'
+        $script:identityChecks++
+        101
+    }
+    function Get-DiscordDebugJson($DebugHost,$DebugPort,$Path,$TimeoutMilliseconds) {
+        if ($Path -eq '/json/version') { return @{Browser='Chrome';'Protocol-Version'='1.3';webSocketDebuggerUrl='ws://127.0.0.1:9222/devtools/browser/ABC'} }
+        [pscustomobject]@{type='page';title='Selected';url='https://discord.com/channels/@me';webSocketDebuggerUrl='ws://127.0.0.1:9222/devtools/page/BBB'}
+    }
+    $start=$source.LastIndexOf('$selected = Select-DiscordClient')
+    $end=$source.IndexOf('$ws = [Net.WebSockets.ClientWebSocket]')
+    foreach ($run in 1,2) {
+        . ([scriptblock]::Create($source.Substring($start,$end-$start)))
+        Assert ($socket -eq 'ws://127.0.0.1:9222/devtools/page/BBB') 'Reuse a real CDP endpoint absent from the Windows listener table on the first and subsequent run'
+    }
+    Assert ($script:identityChecks -ge 4) 'Verify the browser PID before selecting a window and before connecting to it'
+    function Get-DiscordDebugProcessId { 202 }
+    Assert (-not (Test-Port)) 'A hidden port belonging to another client must not be accepted'
+    Assert ($selected.DebugStatus -match 'PID 202') 'Keep the PID mismatch visible in timeout diagnostics'
+    function Get-DiscordDebugProcessId { throw 'Process identity is unavailable' }
+    Assert (-not (Test-Port)) 'A valid HTTP response without process identity must not authorize injection'
 }
 & {
     function Invoke-RestMethod { 'param($Name,$Client) [pscustomobject]@{Name=$Name;Client=$Client}' }

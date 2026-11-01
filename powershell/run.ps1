@@ -135,7 +135,7 @@ function Get-DiscordListeners {
 }
 function Get-DiscordStartupTimeout($MaximumMilliseconds) {
     $remainingSeconds = [Math]::Floor((60000 - $startupWait.Elapsed.TotalMilliseconds) / 1000)
-    if ($remainingSeconds -lt 1) { throw "Discord startup timed out (60-second limit). Client: $($selected.Name), PID: $($selected.ProcessId), debug port: $port. Open that client, wait for it to load, and try again." }
+    if ($remainingSeconds -lt 1) { throw "Discord startup timed out (60-second limit). Client: $($selected.Name), PID: $($selected.ProcessId), debug port: $port. $($selected.DebugStatus)" }
     [int][Math]::Min($MaximumMilliseconds, $remainingSeconds * 1000)
 }
 function Get-DiscordLoopback($Address) {
@@ -159,11 +159,12 @@ function Get-DiscordDebugJson($DebugHost, $DebugPort, $Path, $TimeoutMillisecond
         } finally { $response.Dispose() }
     } finally { $http.Dispose() }
 }
-function Test-Port {
-    $owners = @(Get-DiscordListeners | Where-Object { $_.Port -eq $port -and (Get-DiscordLoopback $_.Address) })
-    if ($selected.ProcessId -notin $owners.ProcessId -and $owners.Count -and ($selected.LaunchedAt -or ($macOS -and -not $selected.ProcessId))) {
+function Confirm-DiscordProcess($ProcessId) {
+    if (-not $ProcessId) { return $false }
+    if ($selected.ProcessId -eq $ProcessId) { return $true }
+    if ($selected.LaunchedAt -or ($macOS -and -not $selected.ProcessId)) {
         $started = @(Get-DiscordClients | Where-Object {
-            if ($_.Name -ne $selected.Name -or $_.ProcessId -notin $owners.ProcessId) { return $false }
+            if ($_.Name -ne $selected.Name -or $_.ProcessId -ne $ProcessId) { return $false }
             if ($macOS) { return $_.Bundle -eq $selected.Bundle }
             if ($_.ProcessId -in $selected.PreviousProcessIds -or -not $_.Created -or $_.Created.ToUniversalTime() -lt $selected.LaunchedAt) { return $false }
             if ((Get-DiscordProfileKey $_.CommandLine) -ne (Get-DiscordProfileKey $selected.CommandLine)) { return $false }
@@ -173,19 +174,78 @@ function Test-Port {
             if ($selected.Updater -or $versioned) { return $_.Executable -and $_.Executable.StartsWith($directory + '\', [StringComparison]::OrdinalIgnoreCase) }
             $_.Executable -eq $selected.Executable
         })
-        if ($started.Count -eq 1) { $selected.ProcessId = $started[0].ProcessId }
+        if ($started.Count -eq 1) { $selected.ProcessId = $started[0].ProcessId; return $true }
     }
-    if (-not $selected.ProcessId -or $selected.ProcessId -notin $owners.ProcessId) { return $false }
-    foreach ($owner in @($owners | Where-Object ProcessId -eq $selected.ProcessId)) {
-        $debugHost = Get-DiscordLoopback $owner.Address
+    return $false
+}
+function Invoke-DiscordProtocol($Socket, $Id, $Method, $Parameters, $TimeoutMilliseconds) {
+    $cts = [Threading.CancellationTokenSource]::new($TimeoutMilliseconds)
+    try {
+        $message = @{ id=$Id; method=$Method; params=$Parameters } | ConvertTo-Json -Compress -Depth 5
+        $bytes = [Text.Encoding]::UTF8.GetBytes($message)
+        [void]$Socket.SendAsync([ArraySegment[byte]]::new($bytes), 'Text', $true, $cts.Token).GetAwaiter().GetResult()
+        while ($true) {
+            $buffer = [IO.MemoryStream]::new()
+            try {
+                do {
+                    $segment = [ArraySegment[byte]]::new([byte[]]::new(16384))
+                    $received = $Socket.ReceiveAsync($segment, $cts.Token).GetAwaiter().GetResult()
+                    if ($received.MessageType -eq 'Close') { throw 'Discord closed the debug socket.' }
+                    $buffer.Write($segment.Array, 0, $received.Count)
+                } while (-not $received.EndOfMessage)
+                $reply = [Text.Encoding]::UTF8.GetString($buffer.ToArray()) | ConvertFrom-Json
+            } finally { $buffer.Dispose() }
+            if ($reply.id -eq $Id) { return $reply }
+        }
+    } finally { $cts.Dispose() }
+}
+function Get-DiscordDebugProcessId($Version, $DebugHost, $DebugPort) {
+    $url = Get-DiscordSocketUrl $Version $DebugPort $DebugHost 'browser'
+    $socket = [Net.WebSockets.ClientWebSocket]::new()
+    $socket.Options.Proxy = $null
+    $cts = [Threading.CancellationTokenSource]::new((Get-DiscordStartupTimeout 2000))
+    try {
+        [void]$socket.ConnectAsync([Uri]$url, $cts.Token).GetAwaiter().GetResult()
+        # Read browser identity only; no renderer code runs until the selected PID is verified.
+        $reply = Invoke-DiscordProtocol $socket 1 'SystemInfo.getProcessInfo' @{} (Get-DiscordStartupTimeout 2000)
+        if ($reply.error) { throw "Could not verify the debug process: $($reply.error.message)" }
+        $browsers = @($reply.result.processInfo | Where-Object type -eq 'browser')
+        $processId = 0
+        if ($browsers.Count -ne 1 -or -not [int]::TryParse([string]$browsers[0].id, [ref]$processId) -or $processId -lt 1) { throw 'Discord did not report a valid browser process ID.' }
+        $processId
+    } finally { $cts.Dispose(); $socket.Dispose() }
+}
+function Test-Port {
+    $owners = @(Get-DiscordListeners | Where-Object { $_.Port -eq $port -and (Get-DiscordLoopback $_.Address) })
+    $targets = @($owners | Where-Object { Confirm-DiscordProcess $_.ProcessId } | ForEach-Object {
+        [pscustomobject]@{ HostName=(Get-DiscordLoopback $_.Address); ProcessId=$_.ProcessId }
+    })
+    if (-not $owners.Count -and ($selected.LaunchedAt -or $port -eq (Get-DiscordDebugPort $selected.CommandLine) -or $port -eq $selected.DefaultPort -or $port -eq $selected.DebugPort)) {
+        # Some network environments hide cross-process listeners from Windows' TCP tables.
+        $targets = @('127.0.0.1','[::1]' | ForEach-Object { [pscustomobject]@{HostName=$_;ProcessId=0} })
+    }
+    $responded = $false
+    foreach ($target in $targets) {
+        $debugHost = $target.HostName
+        $identityAttempted = $false
         try {
             $version = Get-DiscordDebugJson $debugHost $port '/json/version' (Get-DiscordStartupTimeout 2000)
             if ($version.Browser -and $version.'Protocol-Version') {
+                $responded = $true
+                $identityAttempted = $true
+                $processId = if ($target.ProcessId) { $target.ProcessId } else { Get-DiscordDebugProcessId $version $debugHost $port }
+                if (-not (Confirm-DiscordProcess $processId)) {
+                    $selected | Add-Member -NotePropertyName DebugStatus -NotePropertyValue "The debug endpoint reports PID $processId; selected PID is $($selected.ProcessId)." -Force
+                    continue
+                }
                 $selected | Add-Member -NotePropertyName DebugHost -NotePropertyValue $debugHost -Force
                 $selected | Add-Member -NotePropertyName DebugPort -NotePropertyValue $port -Force
+                $selected | Add-Member -NotePropertyName DebugStatus -NotePropertyValue '' -Force
                 return $true
             }
-        } catch { }
+        } catch {
+            if ($identityAttempted -or -not $responded) { $selected | Add-Member -NotePropertyName DebugStatus -NotePropertyValue $_.Exception.GetBaseException().Message -Force }
+        }
     }
     return $false
 }
@@ -316,8 +376,8 @@ function Select-DiscordPage($Pages) {
         Write-Host 'Choose one of the listed numbers.'
     }
 }
-function Get-DiscordSocketUrl($Page, $DebugPort, $DebugHost = '127.0.0.1') {
-    $expected = '^ws://(?:127\.0\.0\.1|localhost|\[::1\]):' + $DebugPort + '(/devtools/page/[a-z0-9-]+)$'
+function Get-DiscordSocketUrl($Page, $DebugPort, $DebugHost = '127.0.0.1', [ValidateSet('page','browser')]$Kind = 'page') {
+    $expected = '^ws://(?:127\.0\.0\.1|localhost|\[::1\]):' + $DebugPort + '(/devtools/' + $Kind + '/[a-z0-9-]+)$'
     if ($Page.webSocketDebuggerUrl -notmatch $expected) { throw 'Unexpected Discord debug socket URL.' }
     if ($DebugHost -notin @('127.0.0.1','[::1]')) { throw 'Unexpected Discord debug host.' }
     "ws://${DebugHost}:$DebugPort$($Matches[1])"
@@ -330,14 +390,14 @@ Write-Host "Using $($selected.Name)$state." -ForegroundColor Cyan
 $startupWait = [Diagnostics.Stopwatch]::StartNew()
 $listeners = @(Get-DiscordListeners)
 $found = $false
-foreach ($candidatePort in @($listeners | Where-Object { $_.ProcessId -eq $selected.ProcessId } | Select-Object -ExpandProperty Port -Unique)) {
+foreach ($candidatePort in @(@($listeners | Where-Object { $_.ProcessId -eq $selected.ProcessId } | Select-Object -ExpandProperty Port) + @((Get-DiscordDebugPort $selected.CommandLine), $selected.DefaultPort) | Where-Object { $_ -gt 0 } | Select-Object -Unique)) {
     $port = $candidatePort
     if (Test-Port) { $found=$true; break }
 }
 if (-not $found) {
     $declaredPort = Get-DiscordDebugPort $selected.CommandLine
     if ($null -ne $declaredPort) {
-        Write-Host 'Remote debugging is already enabled; waiting for its endpoint...' -ForegroundColor Cyan
+        Write-Host 'Remote debugging was requested; checking its endpoint...' -ForegroundColor Cyan
         if ($declaredPort) { $port = $declaredPort }
     } else {
         $port = $selected.DefaultPort
@@ -374,25 +434,9 @@ try {
     $cdpSequence = [ref]0
     function Invoke-Cdp($e, $timeoutMs = 8000) {
         $id = ++$cdpSequence.Value
-        $cts = [Threading.CancellationTokenSource]::new($timeoutMs)
         try {
-            $msg = @{ id = $id; method = "Runtime.evaluate"; params = @{ expression = $e; userGesture = $true; awaitPromise = $false; returnByValue = $true } } | ConvertTo-Json -Compress -Depth 5
-            $b = [Text.Encoding]::UTF8.GetBytes($msg)
-            $ws.SendAsync([ArraySegment[byte]]::new($b), 'Text', $true, $cts.Token).Wait()
-            while ($true) {
-                $buffer = [IO.MemoryStream]::new()
-                try {
-                    do {
-                        $seg = [ArraySegment[byte]]::new([byte[]]::new(16384))
-                        $r = $ws.ReceiveAsync($seg, $cts.Token); $r.Wait()
-                        if ($r.Result.MessageType -eq 'Close') { throw 'Discord closed the debug socket.' }
-                        $buffer.Write($seg.Array, 0, $r.Result.Count)
-                    } while (-not $r.Result.EndOfMessage)
-                    $o = [Text.Encoding]::UTF8.GetString($buffer.ToArray()) | ConvertFrom-Json
-                } finally { $buffer.Dispose() }
-                if ($o.id -eq $id) { return $o }
-            }
-        } catch { return $null } finally { $cts.Dispose() }
+            Invoke-DiscordProtocol $ws $id 'Runtime.evaluate' @{ expression=$e; userGesture=$true; awaitPromise=$false; returnByValue=$true } $timeoutMs
+        } catch { return $null }
     }
 
     # The chunk array exists before the app is usable; wait for the mounted app and signed-in user store.
