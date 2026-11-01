@@ -566,6 +566,7 @@
             </fieldset>
             <p class="riyo-muted">Instant uses simulated activity. Natural runs in real time.</p>
             <div id="bd-box-instant" class="riyo-stack">
+                <details class="riyo-details" open><summary>${riyoIcon("clock")}Game Time Badge</summary><div class="riyo-stack">
                 <div class="riyo-grid">
                 <label class="riyo-label">Hours per game<input id="bd-hours" type="number" min="0" step="0.5" value="1"></label>
                 <div class="riyo-options" id="bd-times">
@@ -580,6 +581,9 @@
                     <button type="button" id="bd-time-2000">Unshakable 2kh</button>
                     <button type="button" id="bd-time-5000">Eternal 5kh</button>
                 </div>
+                </div></details>
+                <details class="riyo-details" open><summary>${riyoIcon("clock")}Game Variety Badge</summary><div class="riyo-stack">
+                <div class="riyo-grid">
                 <label class="riyo-label">Max games (0 = all)<input id="bd-maxgames" type="number" min="0" step="1" value="0"></label>
                 <div class="riyo-options" id="bd-vars">
                     <button type="button" id="bd-var-2">Sampler 2</button>
@@ -594,8 +598,8 @@
                     <button type="button" id="bd-var-105">Universalist 100+</button>
                     <button type="button" id="bd-var-0">All games</button>
                 </div>
-                </div>
-                <details class="riyo-details"><summary>${riyoIcon("video")}Streaming (optional)</summary><div class="riyo-stack">
+                </div></div></details>
+                <details class="riyo-details"><summary>${riyoIcon("video")}Streaming Badge (optional)</summary><div class="riyo-stack">
                 <p class="riyo-muted">Sends simulated stream activity for the selected voice channel.</p>
                 <label class="riyo-label">Stream hours (0 = skip)<input id="bd-streamhours" type="number" min="0" step="0.5" value="0"></label>
                 <div class="riyo-options" id="bd-tiers">
