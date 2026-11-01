@@ -649,9 +649,9 @@
             <p class="riyo-muted">Changes your real house membership.</p>
             <input id="bd-house" type="hidden" value="1">
             <fieldset class="riyo-segmented" aria-label="HypeSquad house">
-                <label><input id="bd-house-1" type="radio" name="bd-house" value="1" checked>Bravery</label>
-                <label><input id="bd-house-2" type="radio" name="bd-house" value="2">Brilliance</label>
-                <label><input id="bd-house-3" type="radio" name="bd-house" value="3">Balance</label>
+                <label><input id="bd-house-1" type="radio" name="bd-house" value="1" checked><img src="https://cdn.discordapp.com/badge-icons/8a88d63823d8a71cd5e390baa45efa02.png" alt="" width="18" height="18">Bravery</label>
+                <label><input id="bd-house-2" type="radio" name="bd-house" value="2"><img src="https://cdn.discordapp.com/badge-icons/011940fd013da3f7fb926e4a1cd2e618.png" alt="" width="18" height="18">Brilliance</label>
+                <label><input id="bd-house-3" type="radio" name="bd-house" value="3"><img src="https://cdn.discordapp.com/badge-icons/3aa41de486fa12454c3761e8e223442e.png" alt="" width="18" height="18">Balance</label>
             </fieldset>
             <div id="bd-status-hype" class="riyo-status" role="status">Not checked.</div>
             <div class="riyo-row">
