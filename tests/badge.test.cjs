@@ -167,6 +167,17 @@ test('tier presets: clicking a tier fills stream hours', async () => {
     assert.equal(q('#bd-streamhours').value, '5000');
 });
 
+test('variety presets: clicking a tier fills max games', async () => {
+    const b = boot();
+    const { sandbox } = b;
+    await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
+    const q = s => b.panel.querySelector(s);
+    q('#bd-var-20').click();
+    assert.equal(q('#bd-maxgames').value, '20');
+    q('#bd-var-105').click();
+    assert.equal(q('#bd-maxgames').value, '105');
+});
+
 test('hypesquad: join posts house, leave deletes', async () => {
     const b = boot();
     const { sandbox, hype } = b;

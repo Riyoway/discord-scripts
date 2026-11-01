@@ -569,6 +569,18 @@
                 <div class="riyo-grid">
                 <label class="riyo-label">Hours per game<input id="bd-hours" type="number" min="0" step="0.5" value="1"></label>
                 <label class="riyo-label">Max games (0 = all)<input id="bd-maxgames" type="number" min="0" step="1" value="0"></label>
+                <div class="riyo-options" id="bd-vars">
+                    <button type="button" id="bd-var-2">Sampler 2</button>
+                    <button type="button" id="bd-var-5">Dabbler 5</button>
+                    <button type="button" id="bd-var-10">Enthusiast 10</button>
+                    <button type="button" id="bd-var-15">Ranger 15</button>
+                    <button type="button" id="bd-var-20">Explorer 20</button>
+                    <button type="button" id="bd-var-30">Adventurer 30</button>
+                    <button type="button" id="bd-var-40">Voyager 40</button>
+                    <button type="button" id="bd-var-60">Maverick 60</button>
+                    <button type="button" id="bd-var-80">Polymath 80</button>
+                    <button type="button" id="bd-var-105">Universalist 100+</button>
+                </div>
                 </div>
                 <details class="riyo-details"><summary>${riyoIcon("video")}Streaming (optional)</summary><div class="riyo-stack">
                 <p class="riyo-muted">Sends simulated stream activity for the selected voice channel.</p>
@@ -641,6 +653,9 @@
         $("bd-mode-natural").addEventListener("change", () => { boxI.hidden = true; boxN.hidden = false; });
         for (const h of [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]) {
             $("bd-tier-" + h).addEventListener("click", () => { $("bd-streamhours").value = String(h); });
+        }
+        for (const n of [2, 5, 10, 15, 20, 30, 40, 60, 80, 105]) {
+            $("bd-var-" + n).addEventListener("click", () => { $("bd-maxgames").value = String(n); });
         }
 
         // instant run
