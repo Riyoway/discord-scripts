@@ -579,31 +579,31 @@
                 <details class="riyo-details" open><summary>${riyoIcon("clock")}Game Time Badge</summary><div class="riyo-stack">
                 <label class="riyo-label">Total game hours (0 = skip)<input id="bd-hours" type="number" min="0" step="0.5" value="5000"></label>
                 <div class="riyo-options" id="bd-times">
-                    <button type="button" id="bd-time-1">Casual 1h</button>
-                    <button type="button" id="bd-time-5">Recreational 5h</button>
-                    <button type="button" id="bd-time-20">Dedicated 20h</button>
-                    <button type="button" id="bd-time-75">Committed 75h</button>
-                    <button type="button" id="bd-time-150">Serious 150h</button>
-                    <button type="button" id="bd-time-300">Devoted 300h</button>
-                    <button type="button" id="bd-time-500">Seasoned 500h</button>
-                    <button type="button" id="bd-time-1000">Ironclad 1kh</button>
-                    <button type="button" id="bd-time-2000">Unshakable 2kh</button>
-                    <button type="button" id="bd-time-5000">Eternal 5kh</button>
+                    <button type="button" id="bd-time-1"><img src="https://cdn.discordapp.com/assets/content/b75fcc4dd1c65dfd4169a203e21023453fd6fe853c9b5c1fd839781fda98e80d.svg" alt="" width="18" height="18">Casual 1h</button>
+                    <button type="button" id="bd-time-5"><img src="https://cdn.discordapp.com/assets/content/f0f32cb2a0003475e443b76a7a2baf454356953ecb84195c7a08c3ce2fd95b70.svg" alt="" width="18" height="18">Recreational 5h</button>
+                    <button type="button" id="bd-time-20"><img src="https://cdn.discordapp.com/assets/content/e0c82f41bcad94a2a52713800fbef7687d0d2c6a6069b09d5e5876156d086e1a.svg" alt="" width="18" height="18">Dedicated 20h</button>
+                    <button type="button" id="bd-time-75"><img src="https://cdn.discordapp.com/assets/content/16f2aeb7465c99efce4d67d9333e3ddcf7435d6e60d2f5f93dc0c07bc7c5a69b.svg" alt="" width="18" height="18">Committed 75h</button>
+                    <button type="button" id="bd-time-150"><img src="https://cdn.discordapp.com/assets/content/ba26e83fa68189b41837184e38706f41c288dd29ffba266035d1a5ad9adbae22.svg" alt="" width="18" height="18">Serious 150h</button>
+                    <button type="button" id="bd-time-300"><img src="https://cdn.discordapp.com/assets/content/851b194288f1913ece6c8d99976519e48210580d6f42d994f21e37801611ad54.svg" alt="" width="18" height="18">Devoted 300h</button>
+                    <button type="button" id="bd-time-500"><img src="https://cdn.discordapp.com/assets/content/8b10f5c0c30abbd521be5afc2e0dd4ec6da18bfbc689f06d93a51d06577cd84a.svg" alt="" width="18" height="18">Seasoned 500h</button>
+                    <button type="button" id="bd-time-1000"><img src="https://cdn.discordapp.com/assets/content/d705628490898f2cc22d669cf8b415bc03fed1ddaf98a2a8cbd97442a509293c.svg" alt="" width="18" height="18">Ironclad 1kh</button>
+                    <button type="button" id="bd-time-2000"><img src="https://cdn.discordapp.com/assets/content/2bddcbc9f9959dab805eb7196c8112ce9dc68b09766c8193ab499b1870e44ac7.svg" alt="" width="18" height="18">Unshakable 2kh</button>
+                    <button type="button" id="bd-time-5000"><img src="https://cdn.discordapp.com/assets/content/457ce4e657f0ced23197891cc3d75b7de29cafa065cdb8cbb81060ac0e63b07f.svg" alt="" width="18" height="18">Eternal 5kh</button>
                 </div>
                 </div></details>
                 <details class="riyo-details" open><summary>${riyoIcon("clock")}Game Variety Badge</summary><div class="riyo-stack">
                 <label class="riyo-label">Max games (0 = all)<input id="bd-maxgames" type="number" min="0" step="1" value="0"></label>
                 <div class="riyo-options" id="bd-vars">
-                    <button type="button" id="bd-var-2">Sampler 2</button>
-                    <button type="button" id="bd-var-5">Dabbler 5</button>
-                    <button type="button" id="bd-var-10">Enthusiast 10</button>
-                    <button type="button" id="bd-var-15">Ranger 15</button>
-                    <button type="button" id="bd-var-20">Explorer 20</button>
-                    <button type="button" id="bd-var-30">Adventurer 30</button>
-                    <button type="button" id="bd-var-40">Voyager 40</button>
-                    <button type="button" id="bd-var-60">Maverick 60</button>
-                    <button type="button" id="bd-var-80">Polymath 80</button>
-                    <button type="button" id="bd-var-105">Universalist 100+</button>
+                    <button type="button" id="bd-var-2"><img src="https://cdn.discordapp.com/assets/content/ed18d5976c01a4ea19f5a13af08f0547582405cbe48b098b0822e352b8e0a822.svg" alt="" width="18" height="18">Sampler 2</button>
+                    <button type="button" id="bd-var-5"><img src="https://cdn.discordapp.com/assets/content/e450d5279537db06ee47a104af520b884adaa7ffc3ef2627157526bf1c58e840.svg" alt="" width="18" height="18">Dabbler 5</button>
+                    <button type="button" id="bd-var-10"><img src="https://cdn.discordapp.com/assets/content/158a9d91b8ca9e96d4afeee38cd640fc51483a8196edb9af0c26e44727acafae.svg" alt="" width="18" height="18">Enthusiast 10</button>
+                    <button type="button" id="bd-var-15"><img src="https://cdn.discordapp.com/assets/content/9e491942070007f64011ae4fc478926b96433698c07621fc43bafdd5efe83912.svg" alt="" width="18" height="18">Ranger 15</button>
+                    <button type="button" id="bd-var-20"><img src="https://cdn.discordapp.com/assets/content/e25fc55814262150e154ddb1a2b55fc5ed8ed5ba2ff1a22a33d4a41e651e370a.svg" alt="" width="18" height="18">Explorer 20</button>
+                    <button type="button" id="bd-var-30"><img src="https://cdn.discordapp.com/assets/content/542d5277e0001ea738d5eb57b247dcab9ce6e0c29493d5892203f6258fde55b9.svg" alt="" width="18" height="18">Adventurer 30</button>
+                    <button type="button" id="bd-var-40"><img src="https://cdn.discordapp.com/assets/content/082e693cb9ce98b81af618978d449409efc6522b061bc0eac6e88a949fd888c6.svg" alt="" width="18" height="18">Voyager 40</button>
+                    <button type="button" id="bd-var-60"><img src="https://cdn.discordapp.com/assets/content/6fc242e9e8259c471a5e4599cd09af5476e622a572ff235883173913bf506103.svg" alt="" width="18" height="18">Maverick 60</button>
+                    <button type="button" id="bd-var-80"><img src="https://cdn.discordapp.com/assets/content/be9a4d119b8e0d7fc1df7e5a12081332637cb9c930500b2fbe6.svg" alt="" width="18" height="18">Polymath 80</button>
+                    <button type="button" id="bd-var-105"><img src="https://cdn.discordapp.com/assets/content/fcc34d343451505c642f3397cec2669a2de3a4a410fb968f794b3a1a0dcd1728.svg" alt="" width="18" height="18">Universalist 100+</button>
                     <button type="button" id="bd-var-0">All games</button>
                 </div>
                 </div></details>
@@ -611,16 +611,16 @@
                 <p class="riyo-muted">Sends simulated stream activity for the selected voice channel.</p>
                 <label class="riyo-label">Stream hours (0 = skip)<input id="bd-streamhours" type="number" min="0" step="0.5" value="0"></label>
                 <div class="riyo-options" id="bd-tiers">
-                    <button type="button" id="bd-tier-1" data-h="1">1h</button>
-                    <button type="button" id="bd-tier-5" data-h="5">5h</button>
-                    <button type="button" id="bd-tier-20" data-h="20">20h</button>
-                    <button type="button" id="bd-tier-75" data-h="75">75h</button>
-                    <button type="button" id="bd-tier-150" data-h="150">150h</button>
-                    <button type="button" id="bd-tier-300" data-h="300">300h</button>
-                    <button type="button" id="bd-tier-500" data-h="500">500h</button>
-                    <button type="button" id="bd-tier-1000" data-h="1000">1kh</button>
-                    <button type="button" id="bd-tier-2000" data-h="2000">2kh</button>
-                    <button type="button" id="bd-tier-5000" data-h="5000">5kh</button>
+                    <button type="button" id="bd-tier-1" data-h="1"><img src="https://cdn.discordapp.com/assets/content/c56b451e3bf04181182c2529e9bd3659e569ea80f582858090007f0752401b38.svg" alt="" width="18" height="18">Newcomer 1h</button>
+                    <button type="button" id="bd-tier-5" data-h="5"><img src="https://cdn.discordapp.com/assets/content/2e25ba794f6f371ea0f52eb2d3c8fb2b04094a56f388515e13a9bd6d7949a018.svg" alt="" width="18" height="18">Fledgling 5h</button>
+                    <button type="button" id="bd-tier-20" data-h="20"><img src="https://cdn.discordapp.com/assets/content/4e847b4dca20fbf1c56d3a47cac3c9204f02113c9d5a270ebebdf12909c75848.svg" alt="" width="18" height="18">Breakout 20h</button>
+                    <button type="button" id="bd-tier-75" data-h="75"><img src="https://cdn.discordapp.com/assets/content/27d0e6939f13dcf113243fc9eac642b15e9764ad891e06c5ed78d45a17678582.svg" alt="" width="18" height="18">Standout 75h</button>
+                    <button type="button" id="bd-tier-150" data-h="150"><img src="https://cdn.discordapp.com/assets/content/af681483be2035f14b0f2bfe2e25a8944c97149172938888ca1008edbe037aad.svg" alt="" width="18" height="18">Trendsetter 150h</button>
+                    <button type="button" id="bd-tier-300" data-h="300"><img src="https://cdn.discordapp.com/assets/content/e69a0c86a476c9782ea1d3e7b5ba308eec3d9d6a3eae6ab8af3180f67d16b468.svg" alt="" width="18" height="18">Headliner 300h</button>
+                    <button type="button" id="bd-tier-500" data-h="500"><img src="https://cdn.discordapp.com/assets/content/06b6206db966635cf626651bdb94eacce5a23ab05dc7f600f7d31aa482b2058c.svg" alt="" width="18" height="18">Star 500h</button>
+                    <button type="button" id="bd-tier-1000" data-h="1000"><img src="https://cdn.discordapp.com/assets/content/1a3b9120ecd64c342083c37980b225d29ebf4544da6ab546c9268f87904c9dfe.svg" alt="" width="18" height="18">Sensation 1kh</button>
+                    <button type="button" id="bd-tier-2000" data-h="2000"><img src="https://cdn.discordapp.com/assets/content/85f714b90ed3ceb1e00e1f2069bf3ebd564962fa940c92540061537a045e54ab.svg" alt="" width="18" height="18">Visionary 2kh</button>
+                    <button type="button" id="bd-tier-5000" data-h="5000"><img src="https://cdn.discordapp.com/assets/content/61331d04b7a9542b38bfa59583360c0b9b93c6496a04f99c0ab37fa1d83ec58a.svg" alt="" width="18" height="18">Phenomenon 5kh</button>
                 </div>
                 <label class="riyo-label">Guild ID (stream)<input id="bd-guild" value="${lsGet(LS_GUILD)}"></label>
                 <label class="riyo-label">Voice channel ID (stream)<input id="bd-channel" value="${lsGet(LS_CHANNEL)}"></label>
