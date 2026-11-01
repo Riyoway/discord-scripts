@@ -10,7 +10,7 @@ const catalog = [game(1), game(2), game(3), game(1), { id: 'mac', name: 'Mac onl
 
 async function harness(options = {}) {
     class Element {
-        constructor() { this.nodes = new Map(); this.events = new Map(); this.disabled = false; }
+        constructor() { this.nodes = new Map(); this.events = new Map(); this.disabled = false; this.dataset = {}; this.style = {}; }
         set innerHTML(html) {
             for (const match of html.matchAll(/<(?:input|button|progress|div)\b([^>]*)>/g)) {
                 const id = match[1].match(/\bid="([^"]+)"/);
@@ -24,6 +24,8 @@ async function harness(options = {}) {
         querySelector(selector) { assert.ok(this.nodes.has(selector), selector); return this.nodes.get(selector); }
         addEventListener(type, handler) { this.events.set(type, handler); }
         click() { return this.events.get('click')?.(); }
+        setAttribute(key, value) { this[key] = value; }
+        getBoundingClientRect() { return { left: 20, top: 64, right: 340, bottom: 364, width: 320, height: 300 }; }
         remove() { body.children = body.children.filter(node => node !== this); }
     }
     const body = { children: [], appendChild(node) { this.children.push(node); } };
@@ -53,7 +55,7 @@ async function harness(options = {}) {
         static now() { return now; }
     }
     const context = vm.createContext({
-        riyoScriptApproved: 'badge-gametime', localStorage: { setItem() {} }, AbortController,
+        innerWidth: 1200, innerHeight: 900, riyoScriptApproved: 'badge-gametime', localStorage: { setItem() {} }, AbortController,
         navigator: { userAgent: options.linux ? 'Discord Linux' : 'Discord Windows' }, Date: FakeDate,
         document: { body, createElement: () => new Element(), getElementById: id => body.children.find(node => node.id === id) },
         console: { log() {}, error: (...args) => errors.push(args) },
@@ -67,7 +69,7 @@ async function harness(options = {}) {
         },
         setTimeout: (callback, delay) => { const id = nextTimer++; timers.set(id, { callback, due: now + delay, delay }); return id; },
         clearTimeout: id => timers.delete(id),
-        addEventListener: (type, callback) => { if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(callback); },
+        addEventListener: (type, callback, options = {}) => { options.signal?.addEventListener('abort', () => listeners.get(type)?.delete(callback), { once: true }); if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(callback); },
         removeEventListener: (type, callback) => listeners.get(type)?.delete(callback)
     });
     context.window = context;

@@ -1,4 +1,4 @@
-// A native dialog also works in Electron, where window.confirm is unsupported.
+// A styled modal keeps focus management and Escape cancellation in Electron.
 const riyoRunScript = (name, run) => {
     const key = 'riyo-scripts:consent:' + name;
     const remember = () => {
@@ -20,7 +20,7 @@ const riyoRunScript = (name, run) => {
         dialog.setAttribute('aria-describedby', titleId + '-message');
         dialog.innerHTML = `${riyoTheme}
             <style>.riyo-consent{top:50%;left:50%;right:auto;margin:0;transform:translate(-50%,-50%)}.riyo-consent:not([open]){display:none}.riyo-consent::backdrop{background:#0009;backdrop-filter:blur(8px)}.riyo-consent p{margin:0}.riyo-consent form{margin:0}</style>
-            <header class="riyo-header"><strong class="riyo-title" id="${titleId}">Run ${name}?</strong></header>
+            <header class="riyo-header"><strong class="riyo-title" id="${titleId}">${riyoHeading(name, `Run ${name}?`)}</strong></header>
             <p id="${titleId}-message">Use this script at your own risk. You are responsible for any consequences, including issues affecting your account or data.</p>
             <form method="dialog" class="riyo-row">
                 <button type="submit" value="no" autofocus>No</button>

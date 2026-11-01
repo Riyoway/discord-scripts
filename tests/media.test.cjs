@@ -37,8 +37,10 @@ const waitFor = async (check) => {
 function harness(base, imagePaths, videoPaths = [], history) {
     const downloads = [], blobs = new Map(), historyCalls = [];
     class Element {
-        constructor(tag) { this.tag = tag; this.children = []; this.nodes = new Map(); this.events = new Map(); }
+        constructor(tag) { this.tag = tag; this.children = []; this.nodes = new Map(); this.events = new Map(); this.dataset = {}; this.style = {}; }
         appendChild(node) { node.parent = this; this.children.push(node); }
+        setAttribute(key, value) { this[key] = value; }
+        getBoundingClientRect() { return { left: 20, top: 64, right: 340, bottom: 364, width: 320, height: 300 }; }
         remove() { if (this.parent) this.parent.children = this.parent.children.filter((node) => node !== this); }
         querySelector(id) {
             if (!this.nodes.has(id)) this.nodes.set(id, new Element("button"));
@@ -66,8 +68,8 @@ function harness(base, imagePaths, videoPaths = [], history) {
         riyoScriptApproved: 'media',
         document, location: { href: base }, fetch, URL: LocalURL, Blob,
         TextEncoder, AbortController, Event, console: { warn() {} },
-        window: { open() { throw new Error("A popup was opened."); } },
-        setTimeout: (fn, ms) => setTimeout(fn, ms).unref()
+        window: { innerWidth: 1200, innerHeight: 900, addEventListener() {}, open() { throw new Error("A popup was opened."); } },
+        setTimeout: (fn, ms) => setTimeout(fn, ms).unref(), clearTimeout
     });
     const api = { get: async ({ url }) => {
         assert.match(url, /^\/channels\/\d+\/messages\?/);

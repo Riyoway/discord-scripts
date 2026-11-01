@@ -29,10 +29,11 @@ function harness(quests, options = {}) {
         static now() { return now; }
     }
     class Element {
-        constructor(tag) { this.tag = tag; this.children = []; this.nodes = new Map(); this.css = {}; }
+        constructor(tag) { this.tag = tag; this.children = []; this.nodes = new Map(); this.css = {}; this.dataset = {}; }
         set style(value) { this.css.cssText = value; }
         get style() { return this.css; }
         setAttribute(key, value) { this[key] = value; }
+        addEventListener() {}
         appendChild(node) { this.children.push(node); node.parent = this; }
         remove() { if (this.parent) this.parent.children = this.parent.children.filter(node => node !== this); }
         querySelector(selector) {
@@ -40,7 +41,7 @@ function harness(quests, options = {}) {
             return this.nodes.get(selector);
         }
         querySelectorAll() { return []; }
-        getBoundingClientRect() { return { left: 20, top: 20 }; }
+        getBoundingClientRect() { return { left: 20, top: 64, right: 340, bottom: 364, width: 320, height: 300 }; }
         get offsetWidth() { return 40; }
         get offsetHeight() { return 40; }
     }
@@ -52,7 +53,7 @@ function harness(quests, options = {}) {
     };
     const window = {
         innerWidth: 1440, innerHeight: 900,
-        addEventListener(type, fn) { if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(fn); },
+        addEventListener(type, fn, options = {}) { options.signal?.addEventListener('abort', () => listeners.get(type)?.delete(fn), { once: true }); if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(fn); },
         removeEventListener(type, fn) { listeners.get(type)?.delete(fn); }
     };
     const realGame = { id: "999", pid: 42, name: "Real game" };
@@ -354,7 +355,7 @@ function harness(quests, options = {}) {
     await settle();
     assert.notEqual(rerun.run, oldRun);
     assert.equal(rerun.subscriberCount(), 1);
-    assert.equal(rerun.listenerCount(), 2);
+    assert.equal(rerun.listenerCount(), 1);
     await rerun.stop();
 
     const activityFailure = harness([makeQuest("ACHIEVEMENT_IN_ACTIVITY")], {

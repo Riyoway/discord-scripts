@@ -18,7 +18,7 @@ function boot() {
             this.tag = tag; this.nodes = new Map(); this.events = new Map();
             this.disabled = false; this.hidden = false;
             this.value = tag === 'select' ? '1' : '';
-            this.checked = false; this.textContent = '';
+            this.checked = false; this.textContent = ''; this.dataset = {}; this.style = {};
         }
         set innerHTML(html) {
             for (const match of html.matchAll(/<(?:input|button|progress|div|select)\b([^>]*)>/g)) {
@@ -33,6 +33,8 @@ function boot() {
         querySelector(s) { assert.ok(this.nodes.has(s), s); return this.nodes.get(s); }
         addEventListener(t, h) { this.events.set(t, h); }
         click() { return this.events.get('click')?.(); }
+        setAttribute(key, value) { this[key] = value; }
+        getBoundingClientRect() { return { left: 20, top: 64, right: 340, bottom: 364, width: 320, height: 300 }; }
         remove() {}
     }
     const store = new Map([['riyo-scripts:consent:badge', 'yes']]);
@@ -67,9 +69,9 @@ function boot() {
         },
         navigator: { userAgent: 'Windows' },
         crypto: { randomUUID: () => '00000000-0000-4000-8000-000000000000' },
-        setTimeout, clearTimeout, console,
+        setTimeout, clearTimeout, console, AbortController,
         riyoScriptApproved: 'badge',
-        window: { addEventListener() {} },
+        window: { innerWidth: 1200, innerHeight: 900, addEventListener() {}, removeEventListener() {} },
         webpackChunkdiscord_app: {
             push() {
                 const api = {
@@ -164,4 +166,15 @@ test('hypesquad: join posts house, leave deletes', async () => {
     assert.match(q('#bd-status-hype').textContent, /Brilliance/);
     await q('#bd-leave').click();
     assert.equal(JSON.stringify(hype[1]), JSON.stringify(['del', { url: '/hypesquad/online' }]));
+});
+
+test('closing an idle badge panel preserves a presence session owned elsewhere', async () => {
+    const b = boot();
+    let stopped = 0;
+    const other = { stop() { stopped++; } };
+    b.sandbox.window.__badgeNaturalPresence = other;
+    await vm.runInContext(source, b.sandbox);
+    b.panel.querySelector('#bd-close').click();
+    assert.equal(stopped, 0);
+    assert.equal(b.sandbox.window.__badgeNaturalPresence, other);
 });

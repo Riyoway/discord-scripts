@@ -4,14 +4,15 @@ const source = fs.readFileSync(path.join(__dirname, "../console/search.js"), "ut
 const message = (id, content) => ({ id: String(id), content, timestamp: "2026-10-01T00:00:00Z", author: { username: "<script>user</script>", id: "1" } });
 function harness(handler, cached = []) {
     class Element {
-        constructor(tag) { this.tag = tag; this.children = []; this.nodes = new Map(); this.events = new Map(); this.style = {}; this.value = ""; }
+        constructor(tag) { this.tag = tag; this.children = []; this.nodes = new Map(); this.events = new Map(); this.style = {}; this.dataset = {}; this.value = ""; }
         appendChild(child) { child.parent = this; this.children.push(child); }
+        setAttribute(key, value) { this[key] = value; }
         remove() { if (this.parent) this.parent.children = this.parent.children.filter(child => child !== this); }
         querySelector(selector) { if (!this.nodes.has(selector)) this.nodes.set(selector, new Element("input")); return this.nodes.get(selector); }
         addEventListener(type, fn) { this.events.set(type, fn); }
         dispatchEvent(event) { this.events.get(event.type)?.(); }
         replaceChildren() { this.children = []; this.textContent = ""; }
-        getBoundingClientRect() { return { left: 20, top: 80 }; }
+        getBoundingClientRect() { return { left: 20, top: 64, right: 340, bottom: 364, width: 320, height: 300 }; }
         click() { if (this.tag === "a") downloads.push({ name: this.download, blob: blobs.get(this.href) }); }
     }
     const body = new Element("body"), listeners = new Map(), downloads = [], blobs = new Map(), calls = [];
@@ -26,7 +27,7 @@ function harness(handler, cached = []) {
         riyoScriptApproved: 'search',
         document, URL: LocalURL, Blob, Event, AbortController, location: { pathname: "/channels/@me/123" },
         webpackChunkdiscord_app: { push: () => ({ c: { lazy: { exports: { default: lazy } }, channels: { exports: { A: channels } }, messages: { exports: { A: messages } }, api: { exports: { Bo: api } } } }), pop() {} },
-        window: { innerWidth: 1200, innerHeight: 900, addEventListener(type, fn) { if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(fn); }, removeEventListener(type, fn) { listeners.get(type)?.delete(fn); } },
+        window: { innerWidth: 1200, innerHeight: 900, addEventListener(type, fn, options = {}) { options.signal?.addEventListener('abort', () => listeners.get(type)?.delete(fn), { once: true }); if (!listeners.has(type)) listeners.set(type, new Set()); listeners.get(type).add(fn); }, removeEventListener(type, fn) { listeners.get(type)?.delete(fn); } },
         setTimeout: (fn, ms) => { const timer = setTimeout(fn, ms === 500 ? 0 : ms); if (ms >= 30000) timer.unref(); return timer; }, clearTimeout
     });
     const execute = () => vm.runInContext(source, context);
@@ -82,7 +83,7 @@ function harness(handler, cached = []) {
     assert.equal(stalled.calls.length, 1); assert.match(stalled.node("search-stats").textContent, /Stopped/); stalled.close();
     const restarted = harness(() => new Promise(() => {}));
     const oldRun = restarted.run(); restarted.execute(); await oldRun;
-    assert.equal(restarted.listenerCount(), 2);
+    assert.equal(restarted.listenerCount(), 1);
     restarted.document.getElementById("discord-search-overlay").dispatchEvent(new Event("search-close"));
     assert.equal(restarted.listenerCount(), 0);
     console.log("PASS: lazy exports, pagination, cache/limit/regex, safe rendering, exports, bounded retries, cancellation and restart cleanup.");

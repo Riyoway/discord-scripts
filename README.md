@@ -21,6 +21,10 @@ For drafting and formatting messages without running code inside Discord, use th
 
 ## Usage
 
+Overlay panels use compact custom controls and a distinct icon for each script. Drag the header to move a panel, or focus the header and use the arrow keys (Shift moves faster). Panels open in available space and come to the front when clicked or focused. Close stops that panel's work and releases its UI listeners; other panels stay open. AutoQuest also supports dragging its monitor icon and has a close/stop button in the monitor.
+
+UI browser checks use `tests/ui.browser.js` with a Playwright page and a static server at `http://127.0.0.1:8791` serving this repository. The fixture mocks Discord and tests all eight overlays together, custom controls, movement, closing/cancellation, narrow windows, and all ten consent dialogs without accessing an account.
+
 Every script runs in Discord's DevTools console, in the desktop app or on discord.com.
 
 Each script asks **Yes/No** before its first run: "Use this script at your own risk. You are responsible for any consequences, including issues affecting your account or data." **No**, an empty answer, or dismissing the dialog cancels execution. **Yes** remembers that script's approval. Menus, browsing, and copying do not require approval; choosing Run from a menu does.

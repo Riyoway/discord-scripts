@@ -11,7 +11,7 @@ function browser() {
     const saved = new Map();
     let dialog, shown = 0;
     const context = vm.createContext({
-        riyoTheme: '', console,
+        riyoTheme: '', riyoHeading: (name, label) => label, console,
         localStorage: { getItem: key => saved.get(key), setItem: (key, value) => saved.set(key, value) },
         document: { body: { appendChild(node) { dialog = node; } }, createElement(tag) {
             assert.equal(tag, 'dialog', 'No script overlay may open before approval');
