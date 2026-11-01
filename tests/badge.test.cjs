@@ -149,10 +149,22 @@ test('instant stream: posts 4-event session with inflated duration', async () =>
     const types = science[0].map(e => e.type);
     assert.deepEqual(types, ['media_session_joined', 'video_stream_started', 'voice_disconnect', 'screenshare_finished']);
     const byType = Object.fromEntries(science[0].map(e => [e.type, e.properties]));
-    assert.equal(byType.voice_disconnect.duration, 5 * 3600 * 1000);
+    assert.ok(byType.voice_disconnect.duration >= 5 * 3600 * 1000);
+    assert.ok(byType.voice_disconnect.duration <= 5.5 * 3600 * 1000);
     assert.equal(byType.voice_disconnect.context, 'stream');
     assert.equal(byType.video_stream_started.sender_user_id, 'U9');
     assert.equal(byType.screenshare_finished.duration, null);
+});
+
+test('tier presets: clicking a tier fills stream hours', async () => {
+    const b = boot();
+    const { sandbox } = b;
+    await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
+    const q = s => b.panel.querySelector(s);
+    q('#bd-tier-20').click();
+    assert.equal(q('#bd-streamhours').value, '20');
+    q('#bd-tier-5000').click();
+    assert.equal(q('#bd-streamhours').value, '5000');
 });
 
 test('hypesquad: join posts house, leave deletes', async () => {

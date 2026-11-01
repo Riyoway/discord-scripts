@@ -573,6 +573,18 @@
                 <details class="riyo-details"><summary>${riyoIcon("video")}Streaming (optional)</summary><div class="riyo-stack">
                 <p class="riyo-muted">Sends simulated stream activity for the selected voice channel.</p>
                 <label class="riyo-label">Stream hours (0 = skip)<input id="bd-streamhours" type="number" min="0" step="0.5" value="0"></label>
+                <div class="riyo-options" id="bd-tiers">
+                    <button type="button" id="bd-tier-1" data-h="1">1h</button>
+                    <button type="button" id="bd-tier-5" data-h="5">5h</button>
+                    <button type="button" id="bd-tier-20" data-h="20">20h</button>
+                    <button type="button" id="bd-tier-75" data-h="75">75h</button>
+                    <button type="button" id="bd-tier-150" data-h="150">150h</button>
+                    <button type="button" id="bd-tier-300" data-h="300">300h</button>
+                    <button type="button" id="bd-tier-500" data-h="500">500h</button>
+                    <button type="button" id="bd-tier-1000" data-h="1000">1kh</button>
+                    <button type="button" id="bd-tier-2000" data-h="2000">2kh</button>
+                    <button type="button" id="bd-tier-5000" data-h="5000">5kh</button>
+                </div>
                 <label class="riyo-label">Guild ID (stream)<input id="bd-guild" value="${lsGet(LS_GUILD)}"></label>
                 <label class="riyo-label">Voice channel ID (stream)<input id="bd-channel" value="${lsGet(LS_CHANNEL)}"></label>
                 </div></details>
@@ -627,6 +639,9 @@
         [1, 2, 3].forEach(house => $("bd-house-" + house).addEventListener("change", event => { if (event.target.checked) $("bd-house").value = event.target.value; }));
         $("bd-mode-instant").addEventListener("change", () => { boxI.hidden = false; boxN.hidden = true; });
         $("bd-mode-natural").addEventListener("change", () => { boxI.hidden = true; boxN.hidden = false; });
+        for (const h of [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]) {
+            $("bd-tier-" + h).addEventListener("click", () => { $("bd-streamhours").value = String(h); });
+        }
 
         // instant run
         $("bd-run-instant").addEventListener("click", async () => {
@@ -677,13 +692,14 @@
                     }
                     statusI.textContent = `Games done: ${ok}/${list.length}.`;
                 }
-                // stream
+                // stream (plus-only jitter: always at least the requested hours)
                 if (streamHours > 0 && id === gen && !instant.stopFlag) {
-                    statusI.textContent = "Sending stream session…";
-                    const dur = Math.floor(streamHours * 3600 * 1000);
+                    const actualHours = streamHours * (1 + Math.random() * 0.10);
+                    statusI.textContent = `Sending stream session… (${actualHours.toFixed(2)}h)`;
+                    const dur = Math.floor(actualHours * 3600 * 1000);
                     const res = await postScience(token, buildStreamEvents(guild, channel, dur, hb, sig, seq));
                     if (res.status !== 204) throw new Error("Stream rejected: HTTP " + res.status);
-                    statusI.textContent += ` Stream ${streamHours}h claimed.`;
+                    statusI.textContent += ` Stream ${actualHours.toFixed(2)}h claimed.`;
                 }
                 if (id === gen && !instant.stopFlag) statusI.textContent += " All done.";
             } catch (error) {
