@@ -568,6 +568,18 @@
             <div id="bd-box-instant" class="riyo-stack">
                 <div class="riyo-grid">
                 <label class="riyo-label">Hours per game<input id="bd-hours" type="number" min="0" step="0.5" value="1"></label>
+                <div class="riyo-options" id="bd-times">
+                    <button type="button" id="bd-time-1">Casual 1h</button>
+                    <button type="button" id="bd-time-5">Recreational 5h</button>
+                    <button type="button" id="bd-time-20">Dedicated 20h</button>
+                    <button type="button" id="bd-time-75">Committed 75h</button>
+                    <button type="button" id="bd-time-150">Serious 150h</button>
+                    <button type="button" id="bd-time-300">Devoted 300h</button>
+                    <button type="button" id="bd-time-500">Seasoned 500h</button>
+                    <button type="button" id="bd-time-1000">Ironclad 1kh</button>
+                    <button type="button" id="bd-time-2000">Unshakable 2kh</button>
+                    <button type="button" id="bd-time-5000">Eternal 5kh</button>
+                </div>
                 <label class="riyo-label">Max games (0 = all)<input id="bd-maxgames" type="number" min="0" step="1" value="0"></label>
                 <div class="riyo-options" id="bd-vars">
                     <button type="button" id="bd-var-2">Sampler 2</button>
@@ -657,6 +669,9 @@
         }
         for (const n of [2, 5, 10, 15, 20, 30, 40, 60, 80, 105, 0]) {
             $("bd-var-" + n).addEventListener("click", () => { $("bd-maxgames").value = String(n); });
+        }
+        for (const h of [1, 5, 20, 75, 150, 300, 500, 1000, 2000, 5000]) {
+            $("bd-time-" + h).addEventListener("click", () => { $("bd-hours").value = String(h); });
         }
 
         // instant run

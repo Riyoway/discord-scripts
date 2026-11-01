@@ -180,6 +180,17 @@ test('variety presets: clicking a tier fills max games', async () => {
     assert.equal(q('#bd-maxgames').value, '0');
 });
 
+test('time presets: clicking a tier fills hours per game', async () => {
+    const b = boot();
+    const { sandbox } = b;
+    await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
+    const q = s => b.panel.querySelector(s);
+    q('#bd-time-20').click();
+    assert.equal(q('#bd-hours').value, '20');
+    q('#bd-time-5000').click();
+    assert.equal(q('#bd-hours').value, '5000');
+});
+
 test('hypesquad: join posts house, leave deletes', async () => {
     const b = boot();
     const { sandbox, hype } = b;
