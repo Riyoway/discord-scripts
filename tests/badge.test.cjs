@@ -21,13 +21,16 @@ function boot() {
             this.checked = false; this.textContent = ''; this.dataset = {}; this.style = {};
         }
         set innerHTML(html) {
-            for (const match of html.matchAll(/<(?:input|button|progress|div|select)\b([^>]*)>/g)) {
-                const id = match[1].match(/\bid="([^"]+)"/);
+            for (const match of html.matchAll(/<(input|button|progress|div|select)\b([^>]*)>([^<]*)/g)) {
+                const id = match[2].match(/\bid="([^"]+)"/);
                 if (!id) continue;
-                const node = new Element('x');
-                node.value = match[1].match(/\bvalue="([^"]*)"/)?.[1] ?? (match[0].startsWith('<select') ? '1' : '');
-                node.checked = /\bchecked\b/.test(match[1]);
-                if (/\bhidden\b/.test(match[1])) node.hidden = true;
+                const node = new Element(match[1]);
+                const v = match[2].match(/\bvalue="([^"]*)"/);
+                node.value = v ? v[1] : (match[1] === 'select' ? '1' : '');
+                node.checked = /\bchecked\b/.test(match[2]);
+                if (match[1] !== 'input' && match[1] !== 'progress') node.textContent = match[3].trim();
+                if (/\bdisabled\b/.test(match[2])) node.disabled = true;
+                if (/\bhidden\b/.test(match[2])) node.hidden = true;
                 this.nodes.set('#' + id[1], node);
             }
         }
@@ -165,28 +168,18 @@ test('time tiers: impossible totals disabled for the chosen variety', async () =
     assert.equal(q('#bd-hours').value, '2.5');
 });
 
-test('instant stream: posts 4-event session with inflated duration', async () => {
+test('stream view: present for the future, everything disabled', async () => {
     const b = boot();
-    const { sandbox, science } = b;
+    const { sandbox } = b;
     await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
     const q = s => b.panel.querySelector(s);
-    q('#bd-hours').value = '0';
-    q('#bd-streamhours').value = '5';
-    q('#bd-guild').value = 'G1';
-    q('#bd-channel').value = 'C1';
-    const p = q('#bd-run-instant').click();
-    await sandbox.window.fetch('https://discord.com/x', { headers: { 'x-super-properties': 'SP' } });
-    await p;
-    await tick(() => q('#bd-status-instant').textContent.includes('done'), 'stream done');
-    assert.equal(science.length, 1);
-    const types = science[0].map(e => e.type);
-    assert.deepEqual(types, ['media_session_joined', 'video_stream_started', 'voice_disconnect', 'screenshare_finished']);
-    const byType = Object.fromEntries(science[0].map(e => [e.type, e.properties]));
-    assert.ok(byType.voice_disconnect.duration >= 5 * 3600 * 1000);
-    assert.ok(byType.voice_disconnect.duration <= 5.5 * 3600 * 1000);
-    assert.equal(byType.voice_disconnect.context, 'stream');
-    assert.equal(byType.video_stream_started.sender_user_id, 'U9');
-    assert.equal(byType.screenshare_finished.duration, null);
+    q('#bd-nav-stream').click();
+    assert.equal(q('#bd-view-stream').hidden, false);
+    assert.equal(q('#bd-view-games').hidden, true);
+    assert.equal(q('#bd-run-stream').disabled, true);
+    assert.equal(q('#bd-streamhours').disabled, true);
+    assert.equal(q('#bd-tier-5000').disabled, true);
+    assert.match(q('#bd-status-stream').textContent, /Unavailable/);
 });
 
 test('instant run: nothing to send when both hours are zero', async () => {
@@ -242,6 +235,9 @@ test('sidebar: switches between game and hypesquad views', async () => {
     await vm.runInContext(source + '\n;undefined', sandbox, { timeout: 5000 });
     const q = s => b.panel.querySelector(s);
     assert.equal(q('#bd-view-hype').hidden, true);
+    q('#bd-nav-stream').click();
+    assert.equal(q('#bd-view-stream').hidden, false);
+    assert.equal(q('#bd-view-games').hidden, true);
     q('#bd-nav-hype').click();
     assert.equal(q('#bd-view-hype').hidden, false);
     assert.equal(q('#bd-view-games').hidden, true);

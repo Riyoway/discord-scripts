@@ -566,6 +566,7 @@
             <div class="bd-app">
             <nav class="bd-side" aria-label="Badge sections">
                 <button type="button" id="bd-nav-games" aria-pressed="true">${riyoIcon("clock")} Game</button>
+                <button type="button" id="bd-nav-stream" aria-pressed="false">${riyoIcon("video")} Streaming</button>
                 <button type="button" id="bd-nav-hype" aria-pressed="false">${riyoIcon("badge")} HypeSquad</button>
             </nav>
             <div class="bd-main">
@@ -607,24 +608,6 @@
                     <button type="button" id="bd-var-0">All games</button>
                 </div>
                 </div></details>
-                <details class="riyo-details"><summary>${riyoIcon("video")}Streaming Badge (optional)</summary><div class="riyo-stack">
-                <p class="riyo-muted">Sends simulated stream activity for the selected voice channel.</p>
-                <label class="riyo-label">Stream hours (0 = skip)<input id="bd-streamhours" type="number" min="0" step="0.5" value="0"></label>
-                <div class="riyo-options" id="bd-tiers">
-                    <button type="button" id="bd-tier-1" data-h="1"><img src="https://cdn.discordapp.com/assets/content/c56b451e3bf04181182c2529e9bd3659e569ea80f582858090007f0752401b38.svg" alt="" width="18" height="18">Newcomer 1h</button>
-                    <button type="button" id="bd-tier-5" data-h="5"><img src="https://cdn.discordapp.com/assets/content/2e25ba794f6f371ea0f52eb2d3c8fb2b04094a56f388515e13a9bd6d7949a018.svg" alt="" width="18" height="18">Fledgling 5h</button>
-                    <button type="button" id="bd-tier-20" data-h="20"><img src="https://cdn.discordapp.com/assets/content/4e847b4dca20fbf1c56d3a47cac3c9204f02113c9d5a270ebebdf12909c75848.svg" alt="" width="18" height="18">Breakout 20h</button>
-                    <button type="button" id="bd-tier-75" data-h="75"><img src="https://cdn.discordapp.com/assets/content/27d0e6939f13dcf113243fc9eac642b15e9764ad891e06c5ed78d45a17678582.svg" alt="" width="18" height="18">Standout 75h</button>
-                    <button type="button" id="bd-tier-150" data-h="150"><img src="https://cdn.discordapp.com/assets/content/af681483be2035f14b0f2bfe2e25a8944c97149172938888ca1008edbe037aad.svg" alt="" width="18" height="18">Trendsetter 150h</button>
-                    <button type="button" id="bd-tier-300" data-h="300"><img src="https://cdn.discordapp.com/assets/content/e69a0c86a476c9782ea1d3e7b5ba308eec3d9d6a3eae6ab8af3180f67d16b468.svg" alt="" width="18" height="18">Headliner 300h</button>
-                    <button type="button" id="bd-tier-500" data-h="500"><img src="https://cdn.discordapp.com/assets/content/06b6206db966635cf626651bdb94eacce5a23ab05dc7f600f7d31aa482b2058c.svg" alt="" width="18" height="18">Star 500h</button>
-                    <button type="button" id="bd-tier-1000" data-h="1000"><img src="https://cdn.discordapp.com/assets/content/1a3b9120ecd64c342083c37980b225d29ebf4544da6ab546c9268f87904c9dfe.svg" alt="" width="18" height="18">Sensation 1kh</button>
-                    <button type="button" id="bd-tier-2000" data-h="2000"><img src="https://cdn.discordapp.com/assets/content/85f714b90ed3ceb1e00e1f2069bf3ebd564962fa940c92540061537a045e54ab.svg" alt="" width="18" height="18">Visionary 2kh</button>
-                    <button type="button" id="bd-tier-5000" data-h="5000"><img src="https://cdn.discordapp.com/assets/content/61331d04b7a9542b38bfa59583360c0b9b93c6496a04f99c0ab37fa1d83ec58a.svg" alt="" width="18" height="18">Phenomenon 5kh</button>
-                </div>
-                <label class="riyo-label">Guild ID (stream)<input id="bd-guild" value="${lsGet(LS_GUILD)}"></label>
-                <label class="riyo-label">Voice channel ID (stream)<input id="bd-channel" value="${lsGet(LS_CHANNEL)}"></label>
-                </div></details>
                 <progress id="bd-progress-instant" value="0" max="1"></progress>
                 <div id="bd-status-instant" class="riyo-status" role="status">Ready.</div>
                 <div class="riyo-row">
@@ -643,6 +626,32 @@
                     <button type="button" id="bd-start-n" class="riyo-primary">${riyoIcon("play")} Start</button>
                 </div>
             </div>
+            </div>
+            <div id="bd-view-stream" class="riyo-stack" hidden>
+                <details class="riyo-details" open><summary>${riyoIcon("video")}Streaming Badge</summary><div class="riyo-stack">
+                <p class="riyo-muted">Currently unavailable: stream time is measured server-side, so simulated sessions do not count (verified).</p>
+                <label class="riyo-label">Stream hours (0 = skip)<input id="bd-streamhours" type="number" min="0" step="0.5" value="0" disabled></label>
+                <div class="riyo-options" id="bd-tiers">
+                    <button type="button" id="bd-tier-1" disabled><img src="https://cdn.discordapp.com/assets/content/c56b451e3bf04181182c2529e9bd3659e569ea80f582858090007f0752401b38.svg" alt="" width="18" height="18">Newcomer 1h</button>
+                    <button type="button" id="bd-tier-5" disabled><img src="https://cdn.discordapp.com/assets/content/2e25ba794f6f371ea0f52eb2d3c8fb2b04094a56f388515e13a9bd6d7949a018.svg" alt="" width="18" height="18">Fledgling 5h</button>
+                    <button type="button" id="bd-tier-20" disabled><img src="https://cdn.discordapp.com/assets/content/4e847b4dca20fbf1c56d3a47cac3c9204f02113c9d5a270ebebdf12909c75848.svg" alt="" width="18" height="18">Breakout 20h</button>
+                    <button type="button" id="bd-tier-75" disabled><img src="https://cdn.discordapp.com/assets/content/27d0e6939f13dcf113243fc9eac642b15e9764ad891e06c5ed78d45a17678582.svg" alt="" width="18" height="18">Standout 75h</button>
+                    <button type="button" id="bd-tier-150" disabled><img src="https://cdn.discordapp.com/assets/content/af681483be2035f14b0f2bfe2e25a8944c97149172938888ca1008edbe037aad.svg" alt="" width="18" height="18">Trendsetter 150h</button>
+                    <button type="button" id="bd-tier-300" disabled><img src="https://cdn.discordapp.com/assets/content/e69a0c86a476c9782ea1d3e7b5ba308eec3d9d6a3eae6ab8af3180f67d16b468.svg" alt="" width="18" height="18">Headliner 300h</button>
+                    <button type="button" id="bd-tier-500" disabled><img src="https://cdn.discordapp.com/assets/content/06b6206db966635cf626651bdb94eacce5a23ab05dc7f600f7d31aa482b2058c.svg" alt="" width="18" height="18">Star 500h</button>
+                    <button type="button" id="bd-tier-1000" disabled><img src="https://cdn.discordapp.com/assets/content/1a3b9120ecd64c342083c37980b225d29ebf4544da6ab546c9268f87904c9dfe.svg" alt="" width="18" height="18">Sensation 1kh</button>
+                    <button type="button" id="bd-tier-2000" disabled><img src="https://cdn.discordapp.com/assets/content/85f714b90ed3ceb1e00e1f2069bf3ebd564962fa940c92540061537a045e54ab.svg" alt="" width="18" height="18">Visionary 2kh</button>
+                    <button type="button" id="bd-tier-5000" disabled><img src="https://cdn.discordapp.com/assets/content/61331d04b7a9542b38bfa59583360c0b9b93c6496a04f99c0ab37fa1d83ec58a.svg" alt="" width="18" height="18">Phenomenon 5kh</button>
+                </div>
+                <label class="riyo-label">Guild ID (stream)<input id="bd-guild" value="${lsGet(LS_GUILD)}" disabled></label>
+                <label class="riyo-label">Voice channel ID (stream)<input id="bd-channel" value="${lsGet(LS_CHANNEL)}" disabled></label>
+                </div></details>
+                <progress id="bd-progress-stream" value="0" max="1"></progress>
+                <div id="bd-status-stream" class="riyo-status" role="status">Unavailable.</div>
+                <div class="riyo-row">
+                    <button type="button" id="bd-stop-stream" class="riyo-danger" disabled>${riyoIcon("stop")} Stop</button>
+                    <button type="button" id="bd-run-stream" class="riyo-primary" disabled>${riyoIcon("play")} Run</button>
+                </div>
             </div>
             <div id="bd-view-hype" class="riyo-stack" hidden>
             <div class="riyo-section riyo-section-title">${riyoIcon('badge')}HypeSquad</div>
@@ -667,13 +676,13 @@
         panel.style.maxWidth = "calc(100vw - 32px)";
         const $ = id => panel.querySelector("#" + id);
         const showView = name => {
-            const games = name === "games";
-            $("bd-view-games").hidden = !games;
-            $("bd-view-hype").hidden = games;
-            $("bd-nav-games").setAttribute("aria-pressed", String(games));
-            $("bd-nav-hype").setAttribute("aria-pressed", String(!games));
+            for (const v of ["games", "stream", "hype"]) {
+                $("bd-view-" + v).hidden = v !== name;
+                $("bd-nav-" + v).setAttribute("aria-pressed", String(v === name));
+            }
         };
         $("bd-nav-games").addEventListener("click", () => showView("games"));
+        $("bd-nav-stream").addEventListener("click", () => showView("stream"));
         $("bd-nav-hype").addEventListener("click", () => showView("hype"));
         const statusI = $("bd-status-instant"), statusN = $("bd-status-n"), statusH = $("bd-status-hype");
         const boxI = $("bd-box-instant"), boxN = $("bd-box-natural");
@@ -725,14 +734,8 @@
             try {
                 const hours = clampNumber($("bd-hours").value, 0, 100000, 1);
                 const maxGames = clampInt($("bd-maxgames").value, 0, 20000, 0);
-                const streamHours = clampNumber($("bd-streamhours").value, 0, 100000, 0);
-                const guild = $("bd-guild").value.trim(), channel = $("bd-channel").value.trim();
-                if (hours <= 0 && streamHours <= 0) throw new Error("Nothing to send: set game hours and/or stream hours.");
+                if (hours <= 0) throw new Error("Nothing to send: set total game hours.");
                 if (natural) { try { natural.stop(); } catch { /* ignore */ } natural = null; }
-                if (streamHours > 0) {
-                    if (!guild || !channel) throw new Error("Guild + voice channel required for stream.");
-                    lsSet(LS_GUILD, guild); lsSet(LS_CHANNEL, channel);
-                }
                 const token = await ensureAuth(t => { if (id === gen) statusI.textContent = t; });
                 if (id !== gen) return;
                 const hb = crypto.randomUUID(), sig = crypto.randomUUID(), seq = { n: 1 };
@@ -769,15 +772,8 @@
                     }
                     statusI.textContent = `Games done: ${ok}/${list.length}.`;
                 }
-                // stream (plus-only jitter: always at least the requested hours)
-                if (streamHours > 0 && id === gen && !instant.stopFlag) {
-                    const actualHours = streamHours * (1 + Math.random() * 0.10);
-                    statusI.textContent = `Sending stream session… (${actualHours.toFixed(2)}h)`;
-                    const dur = Math.floor(actualHours * 3600 * 1000);
-                    const res = await postScience(token, buildStreamEvents(guild, channel, dur, hb, sig, seq));
-                    if (res.status !== 204) throw new Error("Stream rejected: HTTP " + res.status);
-                    statusI.textContent += ` Stream ${actualHours.toFixed(2)}h claimed.`;
-                }
+                // stream sending is disabled: stream time is measured server-side,
+                // so fabricated sessions do not count (verified). builders kept for reference.
                 if (id === gen && !instant.stopFlag) statusI.textContent += " All done.";
             } catch (error) {
                 if (id === gen) statusI.textContent = error?.message || String(error);
