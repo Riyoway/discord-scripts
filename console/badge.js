@@ -562,7 +562,7 @@
                 <strong class="riyo-title">${riyoHeading('badge')}</strong>
                 <button type="button" class="riyo-close" id="bd-close" aria-label="Close badge">${riyoIcon("close")}</button>
             </header>
-            <style>.bd-app{display:flex;gap:12px;min-height:0}.bd-side{display:flex;flex-direction:column;gap:6px;min-width:132px}.bd-side button{justify-content:flex-start;font-size:12px;min-height:34px}.bd-side button[aria-pressed="true"]{background:#f5f5f5;color:#111;border-color:#f5f5f5}.bd-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto}</style>
+            <style>#riyo-badge-panel .riyo-header{min-height:0;padding-bottom:6px}#riyo-badge-panel .riyo-title{font-size:12px}.bd-app{display:flex;gap:12px;min-height:0}.bd-side{display:flex;flex-direction:column;gap:6px;min-width:132px}.bd-side button{justify-content:flex-start;font-size:12px;min-height:34px}.bd-side button[aria-pressed="true"]{background:#f5f5f5;color:#111;border-color:#f5f5f5}.bd-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px;overflow:auto}</style>
             <div class="bd-app">
             <nav class="bd-side" aria-label="Badge sections">
                 <button type="button" id="bd-nav-games" aria-pressed="true">${riyoIcon("clock")} Game</button>
