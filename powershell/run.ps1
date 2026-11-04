@@ -1,6 +1,6 @@
 # Shared Discord desktop injector. Called by the named runners.
 param(
-    [Parameter(Mandatory = $true)][ValidateSet('autoquest', 'token', 'timestamp', 'media', 'whoami', 'export', 'snowflake', 'search', 'badge-gametime', 'badge')][string]$Name,
+    [Parameter(Mandatory = $true)][ValidateSet('autoquest', 'token', 'timestamp', 'media', 'whoami', 'export', 'snowflake', 'search', 'badge')][string]$Name,
     [string]$Client
 )
 $ErrorActionPreference = "Stop"

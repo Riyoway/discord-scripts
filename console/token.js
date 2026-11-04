@@ -19,7 +19,6 @@
             export: '<path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 15h7m-3-3 3 3-3 3"/>',
             snowflake: '<path d="m9 3-4 18m14-18-4 18M4 9h17M3 15h17"/><path d="M4 3h1m14 18h1" stroke-width="3"/>',
             badge: '<path d="m7 15-2 6 5-2 2-3m5-1 2 6-5-2-2-3"/><path d="m12 2 3 2 3 1 1 4-1 4-3 1-3 2-3-2-3-1-1-4 1-4 3-1Z" fill="currentColor" fill-opacity=".09"/><path d="m9 9 2 2 4-4"/>',
-            'badge-gametime': '<path d="M7 7h10c3 0 5 10 3 11-2 1-4-3-5-3H9c-1 0-3 4-5 3C2 17 4 7 7 7Z" fill="currentColor" fill-opacity=".08"/><path d="M7 10v4m-2-2h4m6-1h.01m3 2h.01M9 4h6"/>',
             pause: '<path d="M8 5v14M16 5v14" stroke-width="3"/>',
             play: '<path d="m8 5 11 7-11 7Z" fill="currentColor" fill-opacity=".14"/>',
             stop: '<rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" fill-opacity=".12"/>',
@@ -31,7 +30,7 @@
         };
         return `<svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.65" stroke-linecap="round" stroke-linejoin="round">${paths[name] || paths.copy}</svg>`;
     };
-    const riyoScriptNames = { autoquest: 'AutoQuest', token: 'Token', timestamp: 'Timestamp', media: 'Media', whoami: 'Account', export: 'Export chat', snowflake: 'Snowflake', search: 'Message search', badge: 'Badge', 'badge-gametime': 'Game time' };
+    const riyoScriptNames = { autoquest: 'AutoQuest', token: 'Token', timestamp: 'Timestamp', media: 'Media', whoami: 'Account', export: 'Export chat', snowflake: 'Snowflake', search: 'Message search', badge: 'Badge' };
     const riyoHeading = (name, label = riyoScriptNames[name]) => `<span class="riyo-mark" data-script="${name}">${riyoIcon(name)}</span><span class="riyo-heading">${label}</span>`;
     const riyoMountPanel = (panel, name, reservedHeight = 0) => {
         const state = window.__riyoPanels ??= { panels: new Map(), front: 10000 };
@@ -200,6 +199,8 @@
         });
     };
     // END SHARED UI
+    // Capture DevTools' clipboard helper before the asynchronous first-run dialog.
+    const consoleCopy = typeof copy === 'function' ? copy : null;
     return riyoRunScript('token', () => {
         const chunks = webpackChunkdiscord_app;
         let token;
@@ -207,6 +208,29 @@
             try { Object.values(req.c).some(mod => mod.exports?.setToken && (token = mod.exports.getToken())); } catch { }
         }]);
         chunks.pop();
+        if (typeof token !== 'string' || !token) throw new Error('No token found. Are you logged in to Discord?');
+        // Desktop runners copy the returned value to the OS clipboard themselves.
+        if (typeof riyoScriptApproved !== 'undefined' && riyoScriptApproved === 'token') return token;
+        const notice = riyoNotice('token', 'Copying token…');
+        const status = notice.querySelector('[role=alert]');
+        const retry = document.createElement('button');
+        retry.type = 'button';
+        retry.textContent = 'Copy token';
+        const copyToken = async () => {
+            retry.disabled = true;
+            try {
+                if (consoleCopy) await consoleCopy(token);
+                else await navigator.clipboard.writeText(token);
+                status.textContent = 'Token copied to clipboard.';
+                retry.remove();
+            } catch {
+                status.textContent = 'Clipboard access failed. Click Copy token to try again.';
+                retry.disabled = false;
+                notice.appendChild(retry);
+            }
+        };
+        retry.onclick = copyToken;
+        copyToken();
         return token;
     });
 })();

@@ -5,14 +5,13 @@ Scripts for Discord, served from the [script library](https://script.riyo.me/lib
 | Script | What it does |
 | --- | --- |
 | [`autoquest`](console/autoquest.js) | Processes supported Discord Quests in a queue with confirmed progress, Pause, and Stop |
-| [`token`](console/token.js) | Prints your account token |
+| [`token`](console/token.js) | Copies your account token to the clipboard |
 | [`timestamp`](console/timestamp.js) | Overlay that builds Discord `<t:…>` timestamp codes and copies them |
 | [`media`](console/media.js) | Fetches images and videos in the background with progress and Stop, then saves one ZIP |
 | [`whoami`](console/whoami.js) | Prints your account and a server/DM/friend inventory (read-only) |
 | [`export`](console/export.js) | Saves the open DM/channel as a self-contained, Discord-looking HTML file |
 | [`snowflake`](console/snowflake.js) | Decodes an ID or message link into its creation time and a Discord timestamp |
 | [`search`](console/search.js) | Searches current-channel messages with keywords or RegExp; exports TXT/JSON |
-| [`Discord Game Time & Game Variety Badge`](console/badge-gametime.js) (`badge-gametime`) | Rotates desktop game activity every 23–38 minutes; restores game detection on Stop |
 | [`Badge`](console/badge.js) (`badge`) | Game time, variety, stream hours (instant spoof or natural rotation) plus HypeSquad join/leave, one panel |
 
 `snowflake` uses the timestamp bits and epoch documented in [Discord's Snowflake reference](https://docs.discord.com/developers/reference#snowflakes).
@@ -23,7 +22,7 @@ For drafting and formatting messages without running code inside Discord, use th
 
 Overlay panels use compact custom controls and a distinct icon for each script. Drag the header to move a panel, or focus the header and use the arrow keys (Shift moves faster). Panels open in available space and come to the front when clicked or focused. Close stops that panel's work and releases its UI listeners; other panels stay open. AutoQuest also supports dragging its monitor icon and has a close/stop button in the monitor.
 
-UI browser checks use `tests/ui.browser.js` with a Playwright page and a static server at `http://127.0.0.1:8791` serving this repository. The fixture mocks Discord and tests all eight overlays together, custom controls, movement, closing/cancellation, narrow windows, and all ten consent dialogs without accessing an account.
+UI browser checks use `tests/ui.browser.js` with a Playwright page and a static server at `http://127.0.0.1:8791` serving this repository. The fixture mocks Discord and tests all seven overlays together, custom controls, movement, closing/cancellation, narrow windows, and all nine consent dialogs without accessing an account.
 
 Every script runs in Discord's DevTools console, in the desktop app or on discord.com.
 
@@ -55,7 +54,7 @@ To select a client explicitly, every Windows runner accepts `-Client` with `stab
 
 ```powershell
 & ([scriptblock]::Create((irm https://script.riyo.me/d/p/search))) -Client canary
-& ([scriptblock]::Create((irm https://script.riyo.me/d/p/badge-gametime))) -Client 12345
+& ([scriptblock]::Create((irm https://script.riyo.me/d/p/badge))) -Client 12345
 ```
 
 The injector checks which process owns the debug port. It reuses the selected client's existing port or restarts only that client with a separate port. Windows relaunches preserve the selected process's profile arguments, including `--user-data-dir`. A different client already listening on port 9222 is not used as a substitute. Run `pwsh -NoProfile -File tests/powershell-clients.test.ps1` for the offline routing checks.
@@ -160,21 +159,13 @@ Set **Channel** to a channel ID, channel/message link, or `<#channel ID>` mentio
 
 **Cancel**, closing the panel, and rerunning the script stop further requests and remove drag listeners. Rate limits respect the retry delay, with at most three retries. The panel displays up to 200 matches; exports include all matches scanned before completion or cancellation. **TXT** exports unique URLs, falling back to message text when none exist. **JSON** exports message IDs, timestamps, authors, and content. Searches only read channels accessible to your account.
 
-## Discord Game Time & Game Variety Badge (`badge-gametime`)
-
-Loads Discord's public detectable-game catalog, then uses the desktop client's `RunningGameStore` and activity dispatcher to show one selected game at a time. **Start** activates the first game and keeps running, switching every 23–38 minutes. The candidate pool defaults to 250 games; the last 100 selections are excluded where the pool size permits. Existing real games remain in the game store.
-
-**Session limit (hours)** defaults to 1,000 and caps actual session runtime. It does not instantly add those hours to a badge. The optional ±3% timing wobble defaults to enabled and stays within the 23–38 minute range. The panel shows the active game, next switch time, and different games shown. The former dry-run batch/delay controls are replaced by the rotation schedule.
-
-**Stop**, closing the panel, rerunning the script, or leaving the page cancels the timer and restores the patched methods. Advanced console controls remain available as `window.__multiGamePresence.next()` and `.stop()`. Badge progress is controlled by Discord and is not confirmed by a successful local activity dispatch. Run the offline checks with `node --test tests/badge-gametime.test.cjs`; they use a fake store and clock and do not access an account.
-
 ## Badge (`badge`)
 
-One panel for four badges. The top table shows what each mode can earn. **Instant** posts fabricated `/science` events (game heartbeats with any duration, stream sessions via `voice_disconnect`) in minutes — backdated timestamps, no fingerprint. **Natural** is the `badge-gametime` rotation (game time + variety together, real telemetry, desktop app only, real elapsed time). **HypeSquad** calls the real membership API: pick a house (1 Bravery, 2 Brilliance, 3 Balance), **Join** adds the badge, **Leave** removes it. Badge progress is controlled by Discord (1–2 day cycle) and is not confirmed by a `204`. Run the offline checks with `node --test tests/badge.test.cjs`; they mock fetch/DOM and do not access an account.
+One panel for four badges. The top table shows what each mode can earn. **Instant** posts fabricated `/science` events (game heartbeats with any duration, stream sessions via `voice_disconnect`) in minutes — backdated timestamps, no fingerprint. **Natural** rotates game activity (game time + variety together, real telemetry, desktop app only, real elapsed time). **HypeSquad** calls the real membership API: pick a house (1 Bravery, 2 Brilliance, 3 Balance), **Join** adds the badge, **Leave** removes it. Badge progress is controlled by Discord (1–2 day cycle) and is not confirmed by a `204`. Run the offline checks with `node --test tests/badge.test.cjs`; they mock fetch/DOM and do not access an account.
 
 ## token
 
-Prints your account token as the console result.
+Copies your account token to the clipboard and shows a completion notice when pasted into DevTools. If clipboard access is denied, click **Copy token** in that notice to retry. The token is also returned as the console result; desktop runners keep copying that returned value through the OS clipboard.
 
 > [!WARNING]
 > Your token gives full access to your account. Never share it, and never paste a script someone else sent you into the console.
